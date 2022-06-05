@@ -11,7 +11,7 @@
 				"kind": "build",
 				"isDefault": true
 			},
-			"label": "rust: cargo clippy"
+			"label": "check",
 		},
 		{
 			"type": "cargo",
@@ -19,11 +19,27 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": {
-				"kind": "build",
-				"isDefault": false
-			},
-			"label": "rust: cargo build"
+			"args": [
+				"--release",
+			],
+			"group": "build",
+			"label": "build-os",
+		},
+		{
+			"label": "copy-bin",
+			"type": "shell",
+			"dependsOn":[
+				"build-os"
+			],
+			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros.bin",
+		},
+		{
+			"label": "run",
+			"type": "shell",
+			"dependsOn": [
+				"copy-bin"
+			],
+			"command": ""
 		}
 	]
 }
