@@ -1,6 +1,7 @@
 {
     "rust-analyzer.checkOnSave.allTargets": false,
     "files.associations": {
-        "config" : "toml"
+        "config": "toml",
+        "**/.git/config": "ini",
     }
 }
