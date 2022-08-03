@@ -5,12 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
-            "request": "custom",
-            "name": "Debug",
-            "targetCreateCommands": ["target create ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros-edu"],
-            "processCreateCommands": ["gdb-remote localhost:1234"],
-            "preLaunchTask": "run"
-        }
+            "type": "gdb",
+            "request": "attach",
+            "name": "Attach to gdbserver",
+            "executable": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu",
+            "target": ":1234",
+            "remote": true,
+            "cwd": "${workspaceRoot}",
+            "valuesFormatting": "parseText",
+            "gdbpath": "${workspaceFolder}/../toolchain/riscv64-unknown-elf-toolchain/bin/riscv64-unknown-elf-gdb",
+            "preLaunchTask": "run",
+            "debugger_args": [
+                // "-ex", "file ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu",
+                "-ex", "set arch riscv:rv64",
+                // "-ex", "target remote localhost:1234",
+            ],
+            "stopAtConnect": true,
+        },
     ]
 }

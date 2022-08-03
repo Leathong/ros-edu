@@ -19,9 +19,6 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"args": [
-				"--release"
-			],
 			"group": "build",
 			"label": "build-os"
 		},
@@ -31,7 +28,7 @@
 			"dependsOn":[
 				"build-os"
 			],
-			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros-edu -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros-edu.bin",
+			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu.bin",
 		},
 		{
 			"label": "run",
@@ -55,7 +52,7 @@
                     "endsPattern": "^CPU Reset.*"
                 }
             },
-			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/ros-edu.bin,addr=0x80200000 -s -S"
+			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu.bin,addr=0x80200000 -s -S"
 		}
 	]
 }
