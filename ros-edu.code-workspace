@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"rust-analyzer.checkOnSave.allTargets": false,
+		"files.associations": {
+			"config": "toml",
+			"**/.git/config": "ini"
+		}
+	}
+}
