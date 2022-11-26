@@ -30,7 +30,7 @@
 			"dependsOn":[
 				"build-os"
 			],
-			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu.bin",
+			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
 		},
 		{
 			"label": "run",
@@ -54,7 +54,7 @@
                     "endsPattern": "^CPU Reset.*"
                 }
             },
-			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu.bin,addr=0x80200000"
+			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/os/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000"
 		},
 		{
 			"label": "debug",
@@ -78,7 +78,7 @@
                     "endsPattern": "^CPU Reset.*"
                 }
             },
-			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu.bin,addr=0x80200000 -s -S"
+			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/os/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000 -s -S"
 		}
 	]
 }
