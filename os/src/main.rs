@@ -2,9 +2,7 @@
 #![no_main]
 #![feature(panic_info_message)]
 
-mod lang_items;
-mod sbi;
-mod console;
+use kernel::println;
 
 use core::{arch::{global_asm}, slice};
 
