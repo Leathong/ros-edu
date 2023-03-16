@@ -1,4 +1,9 @@
 [workspace]
 members = [
-    "os"
+    "kernel",
+    "os", 
+    "user"
 ]
+
+[profile.release]
+debug = true

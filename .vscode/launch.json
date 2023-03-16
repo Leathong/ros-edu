@@ -13,7 +13,7 @@
             "remote": true,
             "cwd": "${workspaceRoot}",
             "valuesFormatting": "parseText",
-            "gdbpath": "${workspaceFolder}/toolchain/riscv64-unknown-elf-toolchain/bin/riscv64-unknown-elf-gdb",
+            "gdbpath": "${workspaceFolder}/../toolchain/riscv64-unknown-elf-toolchain/bin/riscv64-unknown-elf-gdb",
             "preLaunchTask": "debug",
             "debugger_args": [
                 // "-ex", "file ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu",
