@@ -4,7 +4,7 @@
 
 use kernel::println;
 
-use core::{arch::{global_asm}, slice};
+use core::arch::global_asm;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -23,13 +23,9 @@ fn clear_bss() {
     }
 
     unsafe {
-        let start = &mut sbss as *mut u8;
-        let end = &mut ebss as *mut u8;
-        let count = end as usize - start as usize;
-        let slice = slice::from_raw_parts_mut(start, count);
-        for i in 0..count {
-            slice[i] = 0;
-        }
+        (sbss as usize .. ebss as usize).for_each(|a| {
+            (a as *mut u8).write_volatile(0);
+        });
     }
 }
 
