@@ -2,9 +2,11 @@
 #![no_main]
 #![feature(panic_info_message)]
 
-use kernel::println;
-
 use core::arch::global_asm;
+
+mod console;
+mod lang_items;
+mod sbi;
 
 global_asm!(include_str!("entry.asm"));
 
