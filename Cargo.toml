@@ -1,9 +1,5 @@
 [workspace]
-members = [
-    "kernel",
-    "os", 
-    "user"
-]
+members = ["os", "ros_core", "user"]
 
 resolver = "2"
 

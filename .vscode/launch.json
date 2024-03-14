@@ -16,8 +16,7 @@
             "gdbpath": "${workspaceFolder}/../toolchain/riscv64-unknown-elf-toolchain/bin/riscv64-unknown-elf-gdb",
             "preLaunchTask": "debug",
             "debugger_args": [
-                // "-ex", "file ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/ros-edu",
-                "-ex", "set arch riscv:rv64",
+                // "-ex", "set arch riscv:rv64",
                 // "-ex", "target remote localhost:1234",
             ],
             "stopAtConnect": true,

@@ -2,4 +2,4 @@
 target = "riscv64gc-unknown-none-elf"
 
 [target.riscv64gc-unknown-none-elf]
-rustflags = ["-Clink-arg=-Tos/src/linker.ld", "-Cforce-frame-pointers=yes"]
+rustflags = ["-C","link-args=-Tos/src/linker.ld --verbose", "-C","force-frame-pointers=yes"]

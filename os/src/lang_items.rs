@@ -1,17 +1,17 @@
 use core::panic::PanicInfo;
-use crate::{println, sbi::shutdown};
+use ros_core::{println, sbi::shutdown};
 
 #[panic_handler]
-pub fn panic(info: &PanicInfo) -> ! {
+pub fn panic_handler(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
             "Panicked at {}:{} {}",
             location.file(),
             location.line(),
-            info.message().unwrap()
+            info.message()
         );
     } else {
-        println!("Panicked: {}", info.message().unwrap())
+        println!("Panicked: {}", info.message())
     }
     shutdown()
 }
