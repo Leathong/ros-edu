@@ -1,9 +1,7 @@
 #![no_std]
 #![no_main]
 
-use kernel::{println};
-
-#[allow(dead_code)]
-fn main() {
-    println!("hello world!")
+mod lang_items;
+fn user_main() {
+    // println!("Hello, world!");
 }

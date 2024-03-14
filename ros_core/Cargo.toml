@@ -1,7 +1,6 @@
 [package]
-name = "user"
+name = "ros_core"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ros_core = { path = "../ros_core" }
