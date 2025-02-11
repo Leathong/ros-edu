@@ -1,9 +1,14 @@
 #![no_std]
 #![no_main]
-#![feature(panic_info_message)]
 
 use core::arch::global_asm;
 
+#[macro_use]
+extern crate bitflags;
+
+mod config;
+mod mm;
+mod sync;
 mod console;
 mod lang_items;
 mod sbi;
@@ -20,12 +25,12 @@ pub fn rust_main() -> ! {
 
 fn clear_bss() {
     extern "C" {
-        static mut sbss:u8;
-        static mut ebss:u8;
+        static mut sbss:usize;
+        static mut ebss:usize;
     }
 
     unsafe {
-        (sbss as usize .. ebss as usize).for_each(|a| {
+        (sbss .. ebss).for_each(|a| {
             (a as *mut u8).write_volatile(0);
         });
     }
