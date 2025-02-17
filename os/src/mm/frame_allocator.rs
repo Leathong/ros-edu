@@ -4,19 +4,9 @@ use super::address::PhysPageNum;
 use core::fmt::{self, Debug, Formatter};
 use alloc::vec::Vec;
 use lazy_static::*;
+use ros_core::println;
 
-use crate::{config::MEMORY_END, mm::address::PhysAddr, sync::UPSafeCell};
-
-pub fn frame_alloc() -> Option<FrameTracker> {
-    FRAME_ALLOCATOR
-        .exclusive_access()
-        .alloc()
-        .map(|ppn| FrameTracker::new(ppn))
-}
-
-fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
-}
+use crate::{config::qemu::MEMORY_END, mm::address::PhysAddr, sync::UPSafeCell};
 
 type FrameAllocatorImpl = StackFrameAllocator;
 lazy_static! {
@@ -24,6 +14,7 @@ lazy_static! {
         unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) };
 }
 
+// === public interface ===
 pub fn init_frame_alocator() {
     unsafe extern "C" {
         static ekernel: usize;
@@ -36,6 +27,38 @@ pub fn init_frame_alocator() {
         );
     }
 }
+
+pub fn frame_alloc() -> Option<FrameTracker> {
+    FRAME_ALLOCATOR
+        .exclusive_access()
+        .alloc()
+        .map(|ppn| FrameTracker::new(ppn))
+}
+
+fn frame_dealloc(ppn: PhysPageNum) {
+    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
+}
+
+// === test ===
+
+pub fn frame_allocator_test() {
+    let mut v: Vec<FrameTracker> = Vec::new();
+    for i in 0..5 {
+        let frame = frame_alloc().unwrap();
+        println!("{:?}", frame);
+        v.push(frame);
+    }
+    v.clear();
+    for i in 0..5 {
+        let frame = frame_alloc().unwrap();
+        println!("{:?}", frame);
+        v.push(frame);
+    }
+    drop(v);
+    println!("frame_allocator_test passed!");
+}
+
+// === impl ===
 
 trait FrameAllocator {
     fn new() -> Self;
