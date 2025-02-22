@@ -7,33 +7,21 @@ use super::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::address::{StepByOne, VPNRange};
 use crate::config::common::{TRAMPOLINE, TRAP_CONTEXT, PAGE_SIZE, USER_STACK_SIZE};
 use crate::config::qemu::{MEMORY_END, MMIO};
-use crate::sync::UPSafeCell;
 use ros_core::println;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::*;
-use riscv::register::satp;
+use riscv::register::satp::{self, Satp};
 use bitflags::bitflags;
-
-unsafe extern "C" {
-    fn stext();
-    fn etext();
-    fn srodata();
-    fn erodata();
-    fn sdata();
-    fn edata();
-    fn sbss_with_stack();
-    fn ebss();
-    fn ekernel();
-    fn strampoline();
-}
+use spin::Mutex;
+use super::linker_args::*;
 
 lazy_static! {
     /// a memory set instance through lazy_static! managing kernel space
-    pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
-        Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
+    pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet>> =
+        Arc::new(Mutex::new(MemorySet::new_kernel()));
 }
 
 /// memory set structure, controls virtual-memory space
@@ -237,7 +225,7 @@ impl MemorySet {
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {
-            satp::write(satp);
+            satp::write(Satp::from_bits(satp));
             asm!("sfence.vma");
         }
     }
@@ -386,7 +374,7 @@ bitflags! {
 
 #[allow(unused)]
 pub fn remap_test() {
-    let mut kernel_space = KERNEL_SPACE.exclusive_access();
+    let mut kernel_space = KERNEL_SPACE.lock();
     let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
     let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
     let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
