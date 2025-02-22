@@ -5,13 +5,14 @@ use core::fmt::{self, Debug, Formatter};
 use alloc::vec::Vec;
 use lazy_static::*;
 use ros_core::println;
+use spin::mutex::Mutex;
 
-use crate::{config::qemu::MEMORY_END, mm::address::PhysAddr, sync::UPSafeCell};
+use crate::{config::qemu::MEMORY_END, mm::address::PhysAddr};
 
 type FrameAllocatorImpl = StackFrameAllocator;
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: UPSafeCell<FrameAllocatorImpl> =
-        unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) };
+    pub static ref FRAME_ALLOCATOR: Mutex<FrameAllocatorImpl> =
+        unsafe { Mutex::new(FrameAllocatorImpl::new()) };
 }
 
 // === public interface ===
@@ -21,7 +22,7 @@ pub fn init_frame_alocator() {
     }
 
     unsafe {
-        FRAME_ALLOCATOR.exclusive_access().init(
+        FRAME_ALLOCATOR.lock().init(
             PhysAddr::from(ekernel).ceil(),
             PhysAddr::from(MEMORY_END).floor(),
         );
@@ -30,13 +31,13 @@ pub fn init_frame_alocator() {
 
 pub fn frame_alloc() -> Option<FrameTracker> {
     FRAME_ALLOCATOR
-        .exclusive_access()
+        .lock()
         .alloc()
         .map(|ppn| FrameTracker::new(ppn))
 }
 
 fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
+    FRAME_ALLOCATOR.lock().dealloc(ppn);
 }
 
 // === test ===

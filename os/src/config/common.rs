@@ -1,7 +1,7 @@
-pub const CONS_1K: usize = 0x400;
+// pub const CONS_1K: usize = 0x400;
 pub const CONS_4K: usize = 0x1000;
 pub const CONS_1M: usize = 0x0010_0000;
-pub const CONS_1G: usize = 0x4000_0000;
+// pub const CONS_1G: usize = 0x4000_0000;
 
 pub const USER_STACK_SIZE: usize = CONS_4K * 2;
 pub const KERNEL_STACK_SIZE: usize = CONS_4K * 2;

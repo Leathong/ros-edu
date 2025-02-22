@@ -6,10 +6,12 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-riscv = { version = "0.12.1" }
-buddy_system_allocator = {version = "0.11.0"}
 ros_core = { path = "../ros_core" }
+riscv = { version = "0.13.0" }
+buddy_system_allocator = {version = "0.11.0"}
 sbi-rt = { version = "0.0.3", features = ["legacy"] }
 bitflags = { version = "2.4.2" }
 lazy_static ={ version = "1.4.0", features = ["spin_no_std"]}
 xmas-elf = { version = "0.9.1" }
+spin = { version = "0.9.8" }
+fdt = { version = "0.1.5" }
