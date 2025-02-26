@@ -1,9 +1,11 @@
 extern crate alloc;
-use alloc::vec;
-use alloc::vec::Vec;
+use crate::config::common::KERNEL_SPACE_OFFSET;
 use crate::mm::address::PhysPageNum;
-use super::{address::VirtPageNum, frame_allocator::{frame_alloc, FrameTracker}};
+use crate::mm::{address::VirtPageNum, frame_allocator::frame_alloc};
 use bitflags::bitflags;
+
+use super::address::VirtAddr;
+use super::linker_args;
 
 bitflags! {
     /// page table entry flags
@@ -61,56 +63,60 @@ impl PageTableEntry {
 /// page table structure
 pub struct PageTable {
     root_ppn: PhysPageNum,
-    frames: Vec<FrameTracker>,
+    kernel_started: bool,
 }
 
 /// Assume that it won't oom when creating/mapping.
 impl PageTable {
-    pub fn new() -> Self {
-        let frame = frame_alloc().unwrap();
-        PageTable {
-            root_ppn: frame.ppn,
-            frames: vec![frame],
-        }
+    pub fn new_kernel() -> Self {
+        let kernel_pt = PageTable {
+            root_ppn: frame_alloc().unwrap(),
+            kernel_started: false,
+        };
+        let entries = kernel_pt.root_ppn.get_pte_array();
+        let l1ppn = frame_alloc().unwrap();
+
+        // Place the root ppn to the last entry of the root PTD to achieve self-mapping.
+        entries[510] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
+        entries[511] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V);
+
+        let skernel = VirtAddr::from(linker_args::skernel as usize);
+        let spage = VirtPageNum::from(skernel);
+        let idx = spage.indexes();
+        // Assume the maximum memory is 1G, so only create 1 level-1 PTD.
+        entries[idx[0]] = PageTableEntry::new(l1ppn, PTEFlags::V);
+        kernel_pt
     }
-    /// Temporarily used to get arguments from user space.
-    pub fn from_token(satp: usize) -> Self {
-        Self {
-            root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
-            frames: Vec::new(),
-        }
-    }
-    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        let idxs = vpn.indexes();
-        let mut ppn = self.root_ppn;
-        let mut result: Option<&mut PageTableEntry> = None;
-        for (i, idx) in idxs.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[*idx];
-            if i == 2 {
-                result = Some(pte);
-                break;
-            }
-            if !pte.is_valid() {
-                let frame = frame_alloc().unwrap();
-                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
-                self.frames.push(frame);
-            }
-            ppn = pte.ppn();
-        }
-        result
-    }
+
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        self.find_or_crate_pte(vpn, false)
+    }
+
+    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        self.find_or_crate_pte(vpn, true)
+    }
+
+    fn find_or_crate_pte(&self, vpn: VirtPageNum, create: bool) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in idxs.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[*idx];
+            let pte = if self.kernel_started {
+                &mut vpn.get_pte_array(*idx)[*idx]
+            } else {
+                &mut ppn.get_pte_array()[*idx]
+            };
             if i == 2 {
                 result = Some(pte);
                 break;
             }
             if !pte.is_valid() {
-                return None;
+                if create {
+                    let frame = frame_alloc().unwrap();
+                    *pte = PageTableEntry::new(frame, PTEFlags::V);
+                } else {
+                    return None;
+                }
             }
             ppn = pte.ppn();
         }

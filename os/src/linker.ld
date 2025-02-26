@@ -24,7 +24,6 @@ SECTIONS
     skernel = .;
     stext = .;
     .text : {
-        strampoline = .;
         *(.text .text.*)
     } >RAM AT>FLASH 
     . = ALIGN(4K);
@@ -35,25 +34,25 @@ SECTIONS
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
     } >RAM AT>FLASH 
-
     . = ALIGN(4K);
     erodata = .;
+
     sdata = .;
     .data : {
         *(.data .data.*)
         *(.sdata .sdata.*)
     } >RAM AT>FLASH 
-
     . = ALIGN(4K);
     edata = .;
+
     sbss_with_stack = .;
     .bss : {
         *(.bss.stack)
+        . = ALIGN(4K);
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     } >RAM AT>FLASH 
-
     . = ALIGN(4K);
     ebss = .;
     ekernel = .;

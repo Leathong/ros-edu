@@ -5,7 +5,7 @@ use ros_core::{println, sbi::shutdown};
 pub fn panic_handler(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
-            "Panicked at {}:{} {}",
+            "Panicked at {}:{}\n{}",
             location.file(),
             location.line(),
             info.message()

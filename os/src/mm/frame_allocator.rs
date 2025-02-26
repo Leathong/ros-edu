@@ -7,7 +7,7 @@ use lazy_static::*;
 use ros_core::println;
 use spin::mutex::Mutex;
 
-use crate::{config::qemu::MEMORY_END, mm::address::PhysAddr};
+use crate::mm::address::PhysAddr;
 
 type FrameAllocatorImpl = StackFrameAllocator;
 lazy_static! {
@@ -16,24 +16,19 @@ lazy_static! {
 }
 
 // === public interface ===
-pub fn init_frame_alocator() {
-    unsafe extern "C" {
-        static ekernel: usize;
-    }
-
+pub fn init_frame_alocator(start: PhysPageNum, end: PhysPageNum) {
     unsafe {
         FRAME_ALLOCATOR.lock().init(
-            PhysAddr::from(ekernel).ceil(),
-            PhysAddr::from(MEMORY_END).floor(),
+            PhysAddr::from(start).ceil(),
+            PhysAddr::from(end).floor(),
         );
     }
 }
 
-pub fn frame_alloc() -> Option<FrameTracker> {
+pub fn frame_alloc() -> Option<PhysPageNum> {
     FRAME_ALLOCATOR
         .lock()
         .alloc()
-        .map(|ppn| FrameTracker::new(ppn))
 }
 
 fn frame_dealloc(ppn: PhysPageNum) {
@@ -42,22 +37,22 @@ fn frame_dealloc(ppn: PhysPageNum) {
 
 // === test ===
 
-pub fn frame_allocator_test() {
-    let mut v: Vec<FrameTracker> = Vec::new();
-    for i in 0..5 {
-        let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
-        v.push(frame);
-    }
-    v.clear();
-    for i in 0..5 {
-        let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
-        v.push(frame);
-    }
-    drop(v);
-    println!("frame_allocator_test passed!");
-}
+// pub fn frame_allocator_test() {
+//     let mut v: Vec<FrameTracker> = Vec::new();
+//     for i in 0..5 {
+//         let frame = frame_alloc().unwrap();
+//         println!("{:?}", frame);
+//         v.push(frame);
+//     }
+//     v.clear();
+//     for i in 0..5 {
+//         let frame = frame_alloc().unwrap();
+//         println!("{:?}", frame);
+//         v.push(frame);
+//     }
+//     drop(v);
+//     println!("frame_allocator_test passed!");
+// }
 
 // === impl ===
 

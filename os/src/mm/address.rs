@@ -55,22 +55,22 @@ impl Debug for PhysPageNum {
 
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        Self(v)
     }
 }
 impl From<usize> for PhysPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PPN_WIDTH_SV39) - 1))
+        Self(v)
     }
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        Self(v)
     }
 }
 impl From<usize> for VirtPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VPN_WIDTH_SV39) - 1))
+        Self(v)
     }
 }
 impl From<PhysAddr> for usize {
@@ -85,11 +85,7 @@ impl From<PhysPageNum> for usize {
 }
 impl From<VirtAddr> for usize {
     fn from(v: VirtAddr) -> Self {
-        if v.0 >= (1 << (VA_WIDTH_SV39 - 1)) {
-            v.0 | (!((1 << VA_WIDTH_SV39) - 1))
-        } else {
-            v.0
-        }
+        v.0
     }
 }
 impl From<VirtPageNum> for usize {
@@ -103,11 +99,7 @@ impl VirtAddr {
         VirtPageNum(self.0 / PAGE_SIZE)
     }
     pub fn ceil(&self) -> VirtPageNum {
-        if self.0 == 0 {
-            VirtPageNum(0)
-        } else {
-            VirtPageNum((self.0 - 1 + PAGE_SIZE) / PAGE_SIZE)
-        }
+        VirtPageNum((self.0 + (PAGE_SIZE - 1)) / PAGE_SIZE)
     }
     pub fn page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
@@ -166,6 +158,30 @@ impl VirtPageNum {
             vpn >>= 9;
         }
         idx
+    }
+
+    pub fn get_pte_array(&self, level: usize) -> &'static mut [PageTableEntry] {
+        let mut va: usize = (*self).into();
+        match level {
+            0 => unsafe {
+                va = va & !0o777_777_777;
+                va = va | 0o777_777_776;
+                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
+            },
+            1 => unsafe {
+                let idx = (va >> 18) & 0o000_777_777;
+                va = va & !0o777_777_000;
+                va = va | 0o777_777_000 | idx;
+                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
+            },
+            2 => unsafe {
+                let idx = (va >> 9) & 0o000_777_777;
+                va = va & !0o777_000_000;
+                va = va | 0o777_000_000 | idx;
+                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
+            },
+            _ => panic!("get_pte_array: level {level} not supported"),
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 unsafe extern "C" {
+    pub fn skernel();
     pub fn stext();
     pub fn etext();
     pub fn srodata();
@@ -9,5 +10,4 @@ unsafe extern "C" {
     pub fn sbss();
     pub fn ebss();
     pub fn ekernel();
-    pub fn strampoline();
 }

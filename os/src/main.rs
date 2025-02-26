@@ -4,7 +4,7 @@
 
 use core::arch::global_asm;
 use fdt::Fdt;
-use ros_core::println;
+use ros_core::{println, sbi::shutdown};
 
 mod config;
 mod mm;
@@ -17,12 +17,10 @@ global_asm!(include_str!("entry.asm"));
 pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::init();
 
-    mm::clear_bss();
-    let _ = parse_dtb(dtb_addr);
-
-    mm::init();
+    let fdt = parse_dtb(dtb_addr);
+    mm::init(&fdt);
     println!("hello world!");
-    panic!("shutdown")
+    shutdown();
 }
 
 fn parse_dtb(dtb_addr: usize) -> Fdt<'static> {
@@ -36,10 +34,6 @@ fn parse_dtb(dtb_addr: usize) -> Fdt<'static> {
             println!("...and is compatible with: {}", cap);
         }
         println!("...and has {} CPU(s)", fdt.cpus().count());
-
-        for mem in fdt.memory().regions() {
-            println!("...memory range : start {:#X}, size {:#X}", mem.starting_address as usize, mem.size.unwrap_or(0));
-        }
 
         let chosen = fdt.chosen();
         if let Some(bootargs) = chosen.bootargs() {

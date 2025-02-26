@@ -5,15 +5,13 @@ use buddy_system_allocator::LockedHeap;
 use ros_core::println;
 
 #[global_allocator]
-static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+static KERNEL_HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
-static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
-
-pub fn init_heap() {
+pub fn init_kernel_heap(start:usize, size: usize) {
     unsafe {
-        HEAP_ALLOCATOR
+        KERNEL_HEAP_ALLOCATOR
             .lock()
-            .init((&raw const HEAP_SPACE) as usize, KERNEL_HEAP_SIZE);
+            .init(start, size);
     }
 }
 
