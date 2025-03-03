@@ -2,14 +2,24 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
-use core::arch::global_asm;
-use fdt::Fdt;
-use ros_core::{println, sbi::shutdown};
+extern crate alloc;
 
+mod console;
 mod config;
 mod mm;
 mod lang_items;
 mod trap;
+mod task;
+mod fs;
+mod schedule;
+mod drivers;
+mod sbi;
+mod timer;
+mod syscall;
+
+use core::arch::global_asm;
+use fdt::Fdt;
+use crate::sbi::shutdown;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -19,8 +29,15 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
 
     let fdt = parse_dtb(dtb_addr);
     mm::init(&fdt);
+
+    trap::init();
+    trap::enable_timer_interrupt();
+
+    fs::list_apps();
+
+    
     println!("hello world!");
-    shutdown();
+    shutdown(false);
 }
 
 fn parse_dtb(dtb_addr: usize) -> Fdt<'static> {

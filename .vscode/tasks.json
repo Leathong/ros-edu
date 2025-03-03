@@ -33,7 +33,7 @@
 			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
 		},
 		{
-			"label": "run",
+			"label": "run-os",
 			"type": "shell",
 			"dependsOn": [
 				"copy-bin"

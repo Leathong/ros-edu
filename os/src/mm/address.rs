@@ -1,7 +1,7 @@
 //! Implementation of physical and virtual address and page number.
 
 use super::page_table::PageTableEntry;
-use crate::config::common::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
 use core::fmt::{self, Debug, Formatter};
 
 /// physical address
@@ -203,7 +203,14 @@ impl PhysPageNum {
 pub trait StepByOne {
     fn step(&mut self);
 }
+
 impl StepByOne for VirtPageNum {
+    fn step(&mut self) {
+        self.0 += 1;
+    }
+}
+
+impl StepByOne for PhysPageNum {
     fn step(&mut self) {
         self.0 += 1;
     }

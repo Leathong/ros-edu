@@ -1,22 +1,19 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
 
-extern crate alloc;
-use super::frame_allocator::{frame_alloc, FrameTracker};
-use super::page_table::{PTEFlags, PageTable, PageTableEntry};
 use super::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::address::{StepByOne, VPNRange};
-use crate::config::common::{self, KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
-use crate::config::qemu::{MEMORY_END, MMIO};
-use ros_core::println;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
+use super::frame_allocator::frame_alloc;
+use super::linker_args::*;
+use super::page_table::{PTEFlags, PageTable};
+use crate::config::{self, KERNEL_SPACE_OFFSET, PAGE_SIZE};
+use crate::config::MMIO;
 use alloc::vec::Vec;
+use bitflags::bitflags;
 use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp::{self, Satp};
-use bitflags::bitflags;
+use crate::println;
 use spin::Mutex;
-use super::linker_args::*;
 
 lazy_static! {
     /// a memory set instance through lazy_static! managing kernel space
@@ -117,7 +114,7 @@ impl MemorySet {
         println!("mapping kernel heap area");
         let mut heap_area = MapArea::new(
             (ekernel as usize).into(),
-            (ekernel as usize + common::KERNEL_HEAP_SIZE).into(),
+            (ekernel as usize + config::KERNEL_HEAP_SIZE).into(),
             MapType::KernelOffset,
             MapPermission::R | MapPermission::W,
         );
@@ -194,7 +191,7 @@ impl MemorySet {
     //         ),
     //         None,
     //     );
-        
+
     //     (
     //         memory_set,
     //         user_stack_top,
@@ -355,20 +352,26 @@ pub fn remap_test() {
     let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
     let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
     let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_text.floor())
-        .unwrap()
-        .writable(),);
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_rodata.floor())
-        .unwrap()
-        .writable(),);
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_data.floor())
-        .unwrap()
-        .executable(),);
+    assert!(
+        !kernel_space
+            .page_table
+            .translate(mid_text.floor())
+            .unwrap()
+            .writable(),
+    );
+    assert!(
+        !kernel_space
+            .page_table
+            .translate(mid_rodata.floor())
+            .unwrap()
+            .writable(),
+    );
+    assert!(
+        !kernel_space
+            .page_table
+            .translate(mid_data.floor())
+            .unwrap()
+            .executable(),
+    );
     println!("remap_test passed!");
 }

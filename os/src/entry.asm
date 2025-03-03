@@ -7,13 +7,7 @@ _start:
     ld t0, 0(t0)
     mv sp, t0
 
-    # load page table
-    la t0, tmp_page_table
-    srli t0, t0, 12      
-    li t1, (0x8 << 60)   
-    or t0, t0, t1   
-    csrw satp, t0
-    sfence.vma
+    call _init_page_table
 
     # load main function address
     la t0, ros_main_addr
@@ -21,6 +15,16 @@ _start:
 
     # jump to main
     jalr ra, t0, 0 
+
+_init_page_table:
+    # load page table
+    la t0, tmp_page_table
+    srli t0, t0, 12      
+    li t1, (0x8 << 60)   
+    or t0, t0, t1   
+    csrw satp, t0
+    sfence.vma
+    ret
 stack_addr:
     .dword boot_stack_top
 ros_main_addr:
@@ -41,7 +45,7 @@ tmp_page_table:
     .section .bss.stack
     .globl boot_stack_lower_bound
 boot_stack_lower_bound:
-    .space 4096 * 16
+    .space 4096 * 4
     .globl boot_stack_top
 boot_stack_top:
 

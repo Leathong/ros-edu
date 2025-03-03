@@ -1,15 +1,17 @@
-mod address;
-mod frame_allocator;
-mod heap_allocator;
+pub(crate) mod address;
+pub(crate) mod frame_allocator;
+pub(crate) mod heap_allocator;
+pub(crate) mod page_table;
+pub(crate) mod memory_set;
 mod linker_args;
-mod memory_set;
-mod page_table;
+
+pub use page_table::UserBuffer;
 
 use address::PhysAddr;
 use memory_set::KERNEL_SPACE;
-use ros_core::println;
+use crate::println;
 
-use crate::config::common::{KERNEL_HEAP_SIZE, KERNEL_SPACE_OFFSET, PAGE_SIZE_BITS};
+use crate::config::{KERNEL_HEAP_SIZE, KERNEL_SPACE_OFFSET, PAGE_SIZE_BITS};
 
 pub fn init(fdt: &fdt::Fdt) {
     clear_bss();

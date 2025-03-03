@@ -1,8 +1,5 @@
-extern crate alloc;
-
-use crate::config::common::*;
 use buddy_system_allocator::LockedHeap;
-use ros_core::println;
+use crate::println;
 
 #[global_allocator]
 static KERNEL_HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();

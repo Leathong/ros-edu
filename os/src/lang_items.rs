@@ -1,5 +1,5 @@
 use core::panic::PanicInfo;
-use ros_core::{println, sbi::shutdown};
+use crate::{println, sbi::shutdown};
 
 #[panic_handler]
 pub fn panic_handler(info: &PanicInfo) -> ! {
@@ -13,5 +13,5 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
     } else {
         println!("Panicked: {}", info.message())
     }
-    shutdown()
+    shutdown(true)
 }
