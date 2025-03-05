@@ -13,6 +13,7 @@ _start:
     la t0, ros_main_addr
     ld t0, 0(t0)
 
+    li s0, 0
     # jump to main
     jalr ra, t0, 0 
 

@@ -2,7 +2,7 @@ use buddy_system_allocator::LockedHeap;
 use crate::println;
 
 #[global_allocator]
-static KERNEL_HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+pub static KERNEL_HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
 pub fn init_kernel_heap(start:usize, size: usize) {
     unsafe {

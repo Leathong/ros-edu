@@ -28,7 +28,7 @@ pub fn init(fdt: &fdt::Fdt) {
     debug_assert!(kernel_end & (1 << PAGE_SIZE_BITS - 1) == 0);
 
     frame_allocator::init_frame_alocator(
-        PhysAddr::from(kernel_end - KERNEL_SPACE_OFFSET).ceil(),
+        PhysAddr::from(kernel_end - KERNEL_SPACE_OFFSET).into(),
         PhysAddr::from(mem_end).floor(),
     );
 

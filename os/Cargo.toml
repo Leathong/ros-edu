@@ -15,5 +15,5 @@ lazy_static ={ version = "1.4.0", features = ["spin_no_std"]}
 xmas-elf = { version = "0.9.1" }
 spin = { version = "0.9.8" }
 fdt = { version = "0.1.5" }
-# virtio-drivers = { version = "0.1.0" }
-virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
+virtio-drivers = { version = "0.9.0" }
+# virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }

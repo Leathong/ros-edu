@@ -1,12 +1,13 @@
 pub mod context;
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm, naked_asm};
 
-use crate::{println, sbi};
+use context::TrapFrame;
+use riscv::register::{scause, sepc, sie, stval, stvec};
 
-use riscv::register::{
-    scause, sie, stval, stvec
-};
+use crate::{println, sbi::shutdown};
+
+const XLENB: usize = 8;
 
 global_asm!(include_str!("trap.S"));
 
@@ -29,13 +30,45 @@ pub fn enable_timer_interrupt() {
     }
 }
 
+#[allow(unused)]
+unsafe fn print_backtrace(fp: usize) {
+    println!("backtrace:");
+    unsafe {
+        let mut fp = fp;
+        let mut idx = 0;
+        while fp != 0 {
+            let ra = *(fp as *const usize).offset(-1);
+            let lfp = *(fp as *const usize).offset(-2);
+            idx += 1;
+
+            println!("\t{}:\tfp: {:#x} lfp: {:#x} ra: {:#x}", idx, fp, lfp, ra);
+            fp = lfp;
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
-fn trap_handler() -> ! {
-    // panic!("a trap occurs!");
+#[allow(unused)]
+fn trap_handler(trapframe: &TrapFrame) -> ! {
     let scause = scause::read();
     let stval = stval::read();
-    println!("a trap occurs! scause: {}, stval: {:#x}", scause.bits(), stval);
-    sbi::shutdown(true);
+    // panic!(
+    //     "a trap occurs! scause: {}, stval: {:#x} sepc: {:#x}",
+    //     scause.bits(),
+    //     stval,
+    //     sepc::read() - 4
+    // );
+
+    println!(
+        "a trap occurs! scause: {}, stval: {:#x} sepc: {:#x}",
+        scause.bits(),
+        stval,
+        sepc::read() - 4
+    );
+    unsafe {
+        print_backtrace(trapframe.general.s0);
+    };
+    shutdown(true)
 }
 
 unsafe extern "C" {

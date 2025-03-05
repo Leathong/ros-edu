@@ -103,7 +103,7 @@ impl MemorySet {
         let mut heap_area = MapArea::new(
             (ekernel as usize).into(),
             (ekernel as usize + config::KERNEL_HEAP_SIZE).into(),
-            MapType::KernelOffset,
+            MapType::Framed,
             MapPermission::R | MapPermission::W,
         );
         heap_area.map(&mut memory_set.page_table);
