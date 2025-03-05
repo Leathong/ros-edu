@@ -3,7 +3,7 @@ use super::File;
 use crate::mm::UserBuffer;
 use crate::print;
 use crate::sbi::console_getchar;
-use crate::task::suspend_current_and_run_next;
+use crate::task::schedule;
 ///Standard input
 pub struct Stdin;
 ///Standard output
@@ -23,7 +23,7 @@ impl File for Stdin {
         loop {
             c = console_getchar();
             if c == 0 {
-                suspend_current_and_run_next();
+                schedule::yield_now();
                 continue;
             } else {
                 break;

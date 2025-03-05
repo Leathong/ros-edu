@@ -11,7 +11,6 @@ mod lang_items;
 mod trap;
 mod task;
 mod fs;
-mod schedule;
 mod drivers;
 mod sbi;
 mod timer;
@@ -19,6 +18,7 @@ mod syscall;
 
 use core::arch::global_asm;
 use fdt::Fdt;
+use task::schedule::yield_now;
 use crate::sbi::shutdown;
 
 global_asm!(include_str!("entry.asm"));
@@ -33,9 +33,13 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::init();
     trap::enable_timer_interrupt();
 
+    timer::set_next_trigger();
+
     fs::list_apps();
 
-    
+    task::add_initproc();
+
+    yield_now();
     println!("hello world!");
     shutdown(false);
 }

@@ -45,7 +45,7 @@ tmp_page_table:
     .section .bss.stack
     .globl boot_stack_lower_bound
 boot_stack_lower_bound:
-    .space 4096 * 4
+    .space 4096 * 16
     .globl boot_stack_top
 boot_stack_top:
 

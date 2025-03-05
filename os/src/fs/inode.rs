@@ -33,7 +33,7 @@ impl OSInode {
         Self {
             readable,
             writable,
-            inner: unsafe { Mutex::new(OSInodeInner { offset: 0, inode }) },
+            inner: Mutex::new(OSInodeInner { offset: 0, inode }),
         }
     }
     /// Read all data inside a inode into vector

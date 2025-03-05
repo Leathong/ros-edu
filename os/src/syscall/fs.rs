@@ -9,7 +9,7 @@ use crate::mm::UserBuffer;
 use crate::task::Task;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let task = Task::current_task().unwrap();
-    let inner = task.inner.borrow_mut();
+    let inner = task.get_mutable_inner();
     
     if fd >= inner.fd_table.len() {
         return -1;
@@ -35,7 +35,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let task = Task::current_task().unwrap();
-    let inner = task.inner.borrow_mut();
+    let inner = task.get_mutable_inner();
     if fd >= inner.fd_table.len() {
         return -1;
     }
@@ -61,10 +61,13 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let task = Task::current_task().unwrap();
 
     let path = unsafe {
-        CStr::from_ptr(path)
+        match CStr::from_ptr(path).to_str() {
+            Ok(path) => path,
+            Err(_) => return -1,
+        }
     };
-    if let Some(inode) = open_file(path.to_str().unwrap(), OpenFlags::from_bits(flags).unwrap()) {
-        let mut inner= task.inner.borrow_mut();
+    if let Some(inode) = open_file(path, OpenFlags::from_bits(flags).unwrap()) {
+        let mut inner= task.get_mutable_inner();
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(inode);
         fd as isize
@@ -75,7 +78,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 
 pub fn sys_close(fd: usize) -> isize {
     let task = Task::current_task().unwrap();
-    let mut inner = task.inner.borrow_mut();
+    let mut inner = task.get_mutable_inner();
     if fd >= inner.fd_table.len() {
         return -1;
     }

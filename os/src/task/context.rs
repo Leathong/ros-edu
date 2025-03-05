@@ -77,4 +77,20 @@ impl TaskContext {
     pub fn tls_pointer(&self) -> usize {
         self.tls
     }
+
+    pub fn set_instruction_pointer(&mut self, ip: usize) {
+        self.pc = ip;
+    }
+
+    pub fn instruction_pointer(&self) -> usize {
+        self.pc
+    }
+
+    pub fn set_stack_pointer(&mut self, sp: usize) {
+        self.regs.sp = sp as u64;
+    }
+
+    pub fn stack_pointer(&self) -> usize {
+        self.regs.sp as usize
+    }
 }

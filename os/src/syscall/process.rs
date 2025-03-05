@@ -1,17 +1,22 @@
+use core::ffi::CStr;
+
 use crate::fs::{open_file, OpenFlags};
+use crate::task::schedule::add_task;
 use crate::task::{
-    suspend_current_and_run_next, Task,
+    self, schedule, Task
 };
 use crate::timer::get_time_ms;
 use alloc::sync::Arc;
 
 pub fn sys_exit(exit_code: i32) -> ! {
-    Task::exit_current(exit_code);
+    let current = Task::current_task().unwrap();
+    current.get_mutable_inner().exit_code = exit_code;
+    current.get_mutable_inner().status = task::TaskStatus::Zombie;
     panic!("Unreachable in sys_exit!");
 }
 
 pub fn sys_yield() -> isize {
-    suspend_current_and_run_next();
+    schedule::yield_now();
     0
 }
 
@@ -23,27 +28,21 @@ pub fn sys_getpid() -> isize {
     Task::current_task().unwrap().pid.value as isize
 }
 
-pub fn sys_fork() -> isize {
-    let current_task = Task::current_task().unwrap();
-    let new_task = current_task.fork();
-    let new_pid = new_task.pid.value;
-    // modify trap context of new_task, because it returns immediately after switching
-    let trap_cx = new_task.inner.borrow_mut().user_ctx;
-    // we do not have to move to next instruction since we have done it before
-    // for child process, fork returns 0
-    trap_cx.general.a0 = 0;//x[10] = 0;
-    // add new task to scheduler
-    add_task(new_task);
-    new_pid as isize
-}
-
-pub fn sys_exec(path: *const u8) -> isize {
-    let path = translated_str(token, path);
-    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+pub fn sys_spawn(path: *const u8) -> isize {
+    let path = unsafe {
+        match CStr::from_ptr(path).to_str() {
+            Ok(path) => path,
+            Err(_) => return -1,
+        }
+    };
+    if let Some(app_inode) = open_file(path, OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
-        let task = Task::current_task().unwrap();
-        task.exec(all_data.as_slice());
-        0
+        let current = Task::current_task().unwrap();
+        let new_task = Arc::new(Task::new(all_data.as_slice()));
+        new_task.get_mutable_inner().parent = Some(Arc::downgrade(&current));
+        current.get_mutable_inner().children.push(new_task.clone());
+        add_task(new_task.clone());
+        new_task.pid.value as isize
     } else {
         -1
     }
@@ -55,29 +54,26 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     let task = Task::current_task().unwrap();
     // find a child process
 
-    let mut inner = task.inner_exclusive_access();
+    let mut inner = task.get_mutable_inner();
     if !inner
         .children
         .iter()
-        .any(|p| pid == -1 || pid as usize == p.getpid())
+        .any(|p| pid == -1 || pid as usize == p.pid.value)
     {
         return -1;
-        // ---- release current PCB
     }
     let pair = inner.children.iter().enumerate().find(|(_, p)| {
-        // ++++ temporarily access child PCB exclusively
-        p.inner_exclusive_access().is_zombie() && (pid == -1 || pid as usize == p.getpid())
-        // ++++ release child PCB
+        p.get_inner().is_zombie() && (pid == -1 || pid as usize == p.pid.value)
     });
     if let Some((idx, _)) = pair {
         let child = inner.children.remove(idx);
         // confirm that child will be deallocated after being removed from children list
         assert_eq!(Arc::strong_count(&child), 1);
-        let found_pid = child.getpid();
-        // ++++ temporarily access child PCB exclusively
-        let exit_code = child.inner_exclusive_access().exit_code;
-        // ++++ release child PCB
-        *translated_refmut(inner.memory_set.token(), exit_code_ptr) = exit_code;
+        let found_pid = child.pid.value;
+        let exit_code = child.get_inner().exit_code;
+        unsafe {
+            *exit_code_ptr = exit_code;
+        }
         found_pid as isize
     } else {
         -2

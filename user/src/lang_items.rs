@@ -1,18 +1,17 @@
-use core::{arch::asm, panic::{self, PanicInfo}};
-// use crate::{println, sbi::shutdown};
+use super::exit;
 
 #[panic_handler]
-pub fn panic_handler(info: &PanicInfo) -> ! {
-    // if let Some(location) = info.location() {
-    //     println!(
-    //         "Panicked at {}:{} {}",
-    //         location.file(),
-    //         location.line(),
-    //         info.message()
-    //     );
-    // } else {
-    //     println!("Panicked: {}", info.message())
-    // }
-    // shutdown()
-    panic!("{}", info.message());
+fn panic_handler(panic_info: &core::panic::PanicInfo) -> ! {
+    let err = panic_info.message();
+    if let Some(location) = panic_info.location() {
+        println!(
+            "Panicked at {}:{}, {}",
+            location.file(),
+            location.line(),
+            err
+        );
+    } else {
+        println!("Panicked: {}", err);
+    }
+    exit(-1);
 }

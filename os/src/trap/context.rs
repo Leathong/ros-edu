@@ -1,17 +1,15 @@
 //! Implementation of [`TrapFrame`]
 use core::ops::{Deref, DerefMut};
 
-use riscv::register::sstatus::{self, Sstatus, SPP};
-
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 ///trap context structure containing sstatus, sepc and registers
 pub struct TrapFrame {
-    /// General registers
+    /// General registers, 0 ~ 31
     pub general: GeneralRegs,
-    /// Supervisor Status
+    /// Supervisor Status, 32
     pub sstatus: usize,
-    /// Supervisor Exception Program Counter
+    /// Supervisor Exception Program Counter, 33
     pub sepc: usize,
 }
 
@@ -53,6 +51,8 @@ pub struct GeneralRegs {
     pub t6: usize,
 }
 
+#[repr(C)]
+#[derive(Debug, Default)]
 pub struct UserContext(TrapFrame);
 
 impl Deref for UserContext {
@@ -85,14 +85,14 @@ impl UserContext {
     }
 
     /// Get syscall args
-    pub fn get_syscall_args(&self) -> [usize; 6] {
+    pub fn get_syscall_args(&self) -> [usize; 3] {
         [
             self.general.a0,
             self.general.a1,
             self.general.a2,
-            self.general.a3,
-            self.general.a4,
-            self.general.a5,
+            // self.general.a3,
+            // self.general.a4,
+            // self.general.a5,
         ]
     }
 
@@ -103,7 +103,7 @@ impl UserContext {
 
     /// Set stack pointer
     pub fn set_sp(&mut self, sp: usize) {
-        self.general.sp = sp;
+        self.0.set_sp(sp);
     }
 
     /// Get stack pointer
@@ -115,6 +115,12 @@ impl UserContext {
     pub fn set_tls(&mut self, tls: usize) {
         self.general.gp = tls;
     }
+
+    pub fn run(&self) {
+        unsafe {
+            run_user(self);
+        }
+    }
 }
 
 impl TrapFrame {
@@ -122,20 +128,8 @@ impl TrapFrame {
     pub fn set_sp(&mut self, sp: usize) {
         self.general.sp = sp;
     }
-    ///init app context
-    pub fn app_init_context(
-        entry: usize,
-        sp: usize
-    ) -> Self {
-        let mut sstatus = sstatus::read();
-        // set CPU privilege to User after trapping back
-        sstatus.set_spp(SPP::User);
-        let mut cx = Self {
-            general: GeneralRegs::default(),
-            sstatus: sstatus.bits(),
-            sepc: entry,
-        };
-        cx.set_sp(sp);
-        cx
-    }
+}
+
+unsafe extern "C" {
+    fn run_user(ctx: &UserContext);
 }

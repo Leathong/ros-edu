@@ -1,10 +1,15 @@
 pub mod context;
 
+use core::arch::global_asm;
+
 use crate::{println, sbi};
 
 use riscv::register::{
     scause, sie, stval, stvec
 };
+
+global_asm!(include_str!("trap.S"));
+
 pub fn init() {
     set_trap_entry();
 }

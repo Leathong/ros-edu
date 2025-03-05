@@ -27,10 +27,17 @@
 		{
 			"label": "copy-bin",
 			"type": "shell",
-			"dependsOn":[
+			"dependsOn": [
 				"build-os"
 			],
-			"command": "rust-objcopy --strip-all ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os -O binary ${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
+			"command": "rust-objcopy",
+			"args": [
+				"--strip-all",
+				"${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os",
+				"-O",
+				"binary",
+				"${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
+			]
 		},
 		{
 			"label": "run-os",
@@ -40,21 +47,36 @@
 			],
 			"isBackground": true,
 			"problemMatcher": {
-                "pattern":[
-                    {
-                        "regexp": "^([^\\\\s].*)\\\\((\\\\d+,\\\\d+)\\\\):\\\\s*(.*)$",
-                        "file": 1,
-                        "location": 2,
-                        "message": 3
-                    }
-                ],
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^qemu-system-riscv64.*",
-                    "endsPattern": "^CPU Reset.*"
-                }
-            },
-			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/os/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000"
+				"pattern": [
+					{
+						"regexp": "^([^\\\\s].*)\\\\((\\\\d+,\\\\d+)\\\\):\\\\s*(.*)$",
+						"file": 1,
+						"location": 2,
+						"message": 3
+					}
+				],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^qemu-system-riscv64.*",
+					"endsPattern": "^CPU Reset.*"
+				}
+			},
+			"command": "qemu-system-riscv64",
+			"args": [
+				"-d",
+				"page,cpu_reset,guest_errors",
+				"-machine",
+				"virt",
+				"-nographic",
+				"-bios",
+				"${workspaceFolder}/os/bootloader/rustsbi-qemu.bin",
+				"-device",
+				"loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000",
+				"-drive",
+				"file=${workspaceFolder}/os/fs.img,if=none,format=raw,id=x0",
+				"-device",
+				"virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0",
+			]
 		},
 		{
 			"label": "debug",
@@ -64,20 +86,20 @@
 			],
 			"isBackground": true,
 			"problemMatcher": {
-                "pattern":[
-                    {
-                        "regexp": "^([^\\\\s].*)\\\\((\\\\d+,\\\\d+)\\\\):\\\\s*(.*)$",
-                        "file": 1,
-                        "location": 2,
-                        "message": 3
-                    }
-                ],
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^qemu-system-riscv64.*",
-                    "endsPattern": "^CPU Reset.*"
-                }
-            },
+				"pattern": [
+					{
+						"regexp": "^([^\\\\s].*)\\\\((\\\\d+,\\\\d+)\\\\):\\\\s*(.*)$",
+						"file": 1,
+						"location": 2,
+						"message": 3
+					}
+				],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^qemu-system-riscv64.*",
+					"endsPattern": "^CPU Reset.*"
+				}
+			},
 			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/os/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000 -s -S"
 		}
 	]

@@ -1,6 +1,5 @@
 use super::address::PhysPageNum;
 use alloc::vec::Vec;
-use core::fmt::{self, Debug, Formatter};
 use lazy_static::*;
 use spin::mutex::Mutex;
 

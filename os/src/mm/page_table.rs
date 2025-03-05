@@ -1,8 +1,10 @@
-use crate::config::KERNEL_SPACE_OFFSET;
+use core::arch::asm;
+
 use crate::mm::address::PhysPageNum;
 use crate::mm::{address::VirtPageNum, frame_allocator::frame_alloc};
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use riscv::register::satp;
 
 use super::address::VirtAddr;
 use super::linker_args;
@@ -22,7 +24,6 @@ bitflags! {
     }
 }
 
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct PageTableEntry {
@@ -36,9 +37,7 @@ impl PageTableEntry {
         }
     }
     pub fn empty() -> Self {
-        PageTableEntry {
-            bits: 0,
-        }
+        PageTableEntry { bits: 0 }
     }
     pub fn ppn(&self) -> PhysPageNum {
         (self.bits >> 10 & ((1usize << 44) - 1)).into()
@@ -66,6 +65,8 @@ pub struct PageTable {
     kernel_started: bool,
 }
 
+const TEMP_PAGE_ADDR: usize = (0o777_777_775 << 12) | !(1 << 39 - 1);
+const ROOT_PAGE_ADDR: usize = (0o777_777_776 << 12) | !(1 << 39 - 1);
 /// Assume that it won't oom when creating/mapping.
 impl PageTable {
     pub fn new_kernel() -> Self {
@@ -77,7 +78,8 @@ impl PageTable {
         let l1ppn = frame_alloc().unwrap();
 
         // Place the root ppn to the last entry of the root PTD to achieve self-mapping.
-        entries[510] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
+        entries[510] =
+            PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
         entries[511] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V);
 
         let skernel = VirtAddr::from(linker_args::skernel as usize);
@@ -85,7 +87,41 @@ impl PageTable {
         let idx = spage.indexes();
         // Assume the maximum memory is 1G, so only create 1 level-1 PTD.
         entries[idx[0]] = PageTableEntry::new(l1ppn, PTEFlags::V);
+
+        let kstack_ppn = frame_alloc().unwrap();
+        entries[508] = PageTableEntry::new(kstack_ppn, PTEFlags::V);
         kernel_pt
+    }
+
+    pub fn spawn(&self) -> Self {
+        debug_assert!(self.kernel_started);
+        let pt = PageTable {
+            root_ppn: frame_alloc().unwrap(),
+            kernel_started: true,
+        };
+
+        // copy kernel space to the new page table
+        let root_entries = self.root_pte_array();
+        self.map_temp_page(pt.root_ppn);
+        let entries =
+            unsafe { core::slice::from_raw_parts_mut(ROOT_PAGE_ADDR as *mut PageTableEntry, 512) };
+        entries[256..512].copy_from_slice(&root_entries[256..512]);
+        pt
+    }
+
+    fn root_pte_array(&self) -> &mut [PageTableEntry] {
+        unsafe { core::slice::from_raw_parts_mut(ROOT_PAGE_ADDR as *mut PageTableEntry, 512) }
+    }
+
+    fn map_temp_page(&self, ppn: PhysPageNum) {
+        let root_entries = self.root_pte_array();
+        root_entries[509] = PageTableEntry::new(ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
+        unsafe {
+            asm!(
+                "li t0, {addr}", 
+                "sfence.vma t0, x0", 
+                addr = const TEMP_PAGE_ADDR);
+        }
     }
 
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
@@ -139,6 +175,15 @@ impl PageTable {
     }
     pub fn token(&self) -> usize {
         0b1000usize << 60 | self.root_ppn.0
+    }
+
+    pub fn active(&mut self) {
+        let satp = self.token();
+        self.kernel_started = true;
+        unsafe {
+            satp::write(satp::Satp::from_bits(satp));
+            asm!("sfence.vma");
+        }
     }
 }
 
@@ -198,4 +243,3 @@ impl Iterator for UserBufferIterator {
         }
     }
 }
-

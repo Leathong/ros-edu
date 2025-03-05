@@ -17,10 +17,12 @@ impl VirtIOBlock {
     #[allow(unused)]
     pub fn new() -> Self {
         unsafe {
+            let blk = match VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)) {
+                Ok(blk) => blk,
+                Err(err) => panic!("Error when creating VirtIOBlk {:?}", err),
+            };
             VirtIOBlock {
-                virtio_blk: Mutex::new(
-                    VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)).unwrap(),
-                ),
+                virtio_blk: Mutex::new(blk),
             }
         }
     }
@@ -28,10 +30,12 @@ impl VirtIOBlock {
 
 impl BlockDevice for VirtIOBlock {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        self.virtio_blk
-            .lock()
-            .read_block(block_id, buf)
-            .expect("Error when reading VirtIOBlk");
+        let res = match self.virtio_blk.lock().read_block(block_id, buf) {
+            Ok(_) => (),
+            Err(err) => panic!("Error when reading VirtIOBlk {:?}", err),
+        };
+        res
+        // .expect("Error when reading VirtIOBlk");
     }
     fn write_block(&self, block_id: usize, buf: &[u8]) {
         self.virtio_blk
