@@ -1,28 +1,51 @@
-use crate::mm::{
-    address::{PhysAddr, PhysPageNum, StepByOne},
-    frame_allocator::{frame_alloc, frame_dealloc},
+use core::ptr::NonNull;
+
+use crate::{
+    mm::{
+        address::{PhysAddr, PhysPageNum, StepByOne},
+        frame_allocator::{frame_alloc, frame_dealloc},
+    },
+    println,
 };
 use easy_fs::BlockDevice;
 use spin::Mutex;
-use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
+use virtio_drivers::{
+    Hal,
+    device::blk::VirtIOBlk,
+    transport::{
+        Transport,
+        mmio::{MmioTransport, VirtIOHeader},
+    },
+};
 
 #[allow(unused)]
 const VIRTIO0: usize = 0x10001000;
 
 pub struct VirtIOBlock {
-    virtio_blk: Mutex<VirtIOBlk<'static, VirtioHal>>,
+    virtio_blk: Mutex<VirtIOBlk<VirtioHal, MmioTransport>>,
 }
 
 impl VirtIOBlock {
     #[allow(unused)]
     pub fn new() -> Self {
         unsafe {
-            let blk = match VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)) {
-                Ok(blk) => blk,
-                Err(err) => panic!("Error when creating VirtIOBlk {:?}", err),
-            };
-            VirtIOBlock {
-                virtio_blk: Mutex::new(blk),
+            let header = NonNull::new(VIRTIO0 as *mut VirtIOHeader).unwrap();
+            let size = 0x1000;
+            match MmioTransport::new(header, size) {
+                Err(e) => panic!("Error creating VirtIO MMIO transport: {}", e),
+                Ok(transport) => {
+                    println!(
+                        "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}",
+                        transport.vendor_id(),
+                        transport.device_type(),
+                        transport.version(),
+                    );
+                    let mut blk = VirtIOBlk::new(transport)
+                        .expect("failed to create blk driver");
+                    VirtIOBlock {
+                        virtio_blk: Mutex::new(blk),
+                    }
+                }
             }
         }
     }
@@ -30,7 +53,7 @@ impl VirtIOBlock {
 
 impl BlockDevice for VirtIOBlock {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        let res = match self.virtio_blk.lock().read_block(block_id, buf) {
+        let res = match self.virtio_blk.lock().read_blocks(block_id, buf) {
             Ok(_) => (),
             Err(err) => panic!("Error when reading VirtIOBlk {:?}", err),
         };
@@ -40,47 +63,45 @@ impl BlockDevice for VirtIOBlock {
     fn write_block(&self, block_id: usize, buf: &[u8]) {
         self.virtio_blk
             .lock()
-            .write_block(block_id, buf)
+            .write_blocks(block_id, buf)
             .expect("Error when writing VirtIOBlk");
     }
 }
 
 pub struct VirtioHal;
 
-impl Hal for VirtioHal {
-    fn dma_alloc(pages: usize) -> usize {
-        let mut ppn_base = PhysPageNum(0);
-        for i in 0..pages {
-            let frame = frame_alloc().unwrap();
-            if i == 0 {
-                ppn_base = frame;
-            }
-            assert_eq!(frame.0, ppn_base.0 + i);
-            // QUEUE_FRAMES.exclusive_access().push(frame);
-        }
-        let pa: PhysAddr = ppn_base.into();
-        pa.0
+unsafe impl Hal for VirtioHal {
+    fn dma_alloc(
+        pages: usize,
+        direction: virtio_drivers::BufferDirection,
+    ) -> (virtio_drivers::PhysAddr, NonNull<u8>) {
+        todo!()
     }
 
-    fn dma_dealloc(pa: usize, pages: usize) -> i32 {
-        let pa = PhysAddr::from(pa);
-        let mut ppn_base: PhysPageNum = pa.into();
-        for _ in 0..pages {
-            frame_dealloc(ppn_base);
-            ppn_base.step();
-        }
-        0
+    unsafe fn dma_dealloc(
+        paddr: virtio_drivers::PhysAddr,
+        vaddr: NonNull<u8>,
+        pages: usize,
+    ) -> i32 {
+        todo!()
     }
 
-    fn phys_to_virt(addr: usize) -> usize {
-        addr
+    unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> NonNull<u8> {
+        todo!()
     }
 
-    fn virt_to_phys(vaddr: usize) -> usize {
-        // PageTable::from_token(kernel_token())
-        //     .translate_va(VirtAddr::from(vaddr))
-        //     .unwrap()
-        //     .0
-        vaddr
+    unsafe fn share(
+        buffer: NonNull<[u8]>,
+        direction: virtio_drivers::BufferDirection,
+    ) -> virtio_drivers::PhysAddr {
+        todo!()
+    }
+
+    unsafe fn unshare(
+        paddr: virtio_drivers::PhysAddr,
+        buffer: NonNull<[u8]>,
+        direction: virtio_drivers::BufferDirection,
+    ) {
+        todo!()
     }
 }
