@@ -84,17 +84,17 @@ unsafe impl Hal for VirtioHal {
             .alloc(Layout::from_size_align(pages * PAGE_SIZE, PAGE_SIZE).unwrap())
             .unwrap();
         let vaddr = VirtAddr::from(ptr.as_ptr() as usize);
-        println!("{}::{} ptr {:x}", file!(), line!(), vaddr.0);
+        println!("----[track]: {}::{} ptr {:x}", file!(), line!(), vaddr.0);
         let pte = KERNEL_SPACE
             .lock()
             .get_page_table()
             .translate(VirtPageNum::from(vaddr))
             .unwrap();
-        println!("{}::{}", file!(), line!());
+        println!("----[track]: {}::{}", file!(), line!());
         unsafe {
             ADDR_OFF_SET = ptr.as_ptr() as usize - pte.ppn().0 << 12;
         }
-        println!("{}::{}", file!(), line!());
+        println!("----[track]: {}::{}", file!(), line!());
         println!(
             "dma_alloc: {:x} {:x} {:x}",
             pte.ppn().0,
@@ -109,6 +109,7 @@ unsafe impl Hal for VirtioHal {
         vaddr: NonNull<u8>,
         pages: usize,
     ) -> i32 {
+        println!("----[track]: {}::{}", file!(), line!());
         heap_allocator::KERNEL_HEAP_ALLOCATOR.lock().dealloc(
             vaddr,
             Layout::from_size_align(pages * PAGE_SIZE, PAGE_SIZE).unwrap(),
@@ -117,6 +118,7 @@ unsafe impl Hal for VirtioHal {
     }
 
     unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> NonNull<u8> {
+        println!("----[track]: {}::{}", file!(), line!());
         if paddr < KERNEL_SPACE_OFFSET {
             NonNull::new(paddr as *mut u8).unwrap()
         } else {
@@ -128,6 +130,7 @@ unsafe impl Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) -> virtio_drivers::PhysAddr {
+        println!("----[track]: {}::{}", file!(), line!());
         let vaddr = buffer.as_ptr() as *mut u8 as usize;
         if vaddr < KERNEL_SPACE_OFFSET {
             vaddr
@@ -141,6 +144,6 @@ unsafe impl Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) {
-        // do nothing
+        println!("----[track]: {}::{}", file!(), line!());
     }
 }

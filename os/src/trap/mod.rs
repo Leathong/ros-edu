@@ -32,12 +32,12 @@ pub fn enable_timer_interrupt() {
 
 #[allow(unused)]
 unsafe fn print_backtrace(fp: usize) {
-    println!("backtrace:");
+    println!("\nbacktrace:");
     unsafe {
         let mut fp = fp;
         let mut idx = 0;
         while fp != 0 {
-            let ra = *(fp as *const usize).offset(-1);
+            let ra = *(fp as *const usize).offset(-1) - 4;
             let lfp = *(fp as *const usize).offset(-2);
             idx += 1;
 
@@ -45,6 +45,7 @@ unsafe fn print_backtrace(fp: usize) {
             fp = lfp;
         }
     }
+    println!("backtrace end\n");
 }
 
 #[unsafe(no_mangle)]
@@ -60,7 +61,7 @@ fn trap_handler(trapframe: &TrapFrame) -> ! {
     // );
 
     println!(
-        "a trap occurs! scause: {}, stval: {:#x} sepc: {:#x}",
+        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x}",
         scause.bits(),
         stval,
         sepc::read() - 4

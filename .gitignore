@@ -2,3 +2,5 @@
 Cargo.lock
 vendor/
 **/toolchain
+
+crash.txt
