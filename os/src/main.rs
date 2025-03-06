@@ -33,11 +33,8 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
 
     trap::init();
     trap::enable_timer_interrupt();
-
     timer::set_next_trigger();
-
     fs::list_apps();
-
     task::add_initproc();
 
     yield_now();

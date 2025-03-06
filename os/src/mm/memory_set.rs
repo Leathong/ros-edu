@@ -211,8 +211,8 @@ impl MapArea {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::KernelOffset => {
-                let virt_addr = VirtAddr::from(vpn).0 - KERNEL_SPACE_OFFSET;
-                ppn = PhysAddr::from(virt_addr).into();
+                let paddr = VirtAddr::from(vpn).0 - KERNEL_SPACE_OFFSET;
+                ppn = PhysAddr::from(paddr).into();
             }
             MapType::Identical => {
                 ppn = PhysPageNum(vpn.0);
@@ -220,6 +220,7 @@ impl MapArea {
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
                 ppn = frame;
+                // println!("\t map one page: {:#x} -> {:#x}", ppn.0, vpn.0);
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();

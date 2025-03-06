@@ -1,7 +1,7 @@
 //! Implementation of physical and virtual address and page number.
 
 use super::page_table::PageTableEntry;
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::{config::{PAGE_SIZE, PAGE_SIZE_BITS}, println};
 use core::fmt::{self, Debug, Formatter};
 
 /// physical address
@@ -161,27 +161,28 @@ impl VirtPageNum {
     }
 
     pub fn get_pte_array(&self, level: usize) -> &'static mut [PageTableEntry] {
-        let mut va: usize = (*self).into();
-        match level {
-            0 => unsafe {
-                va = va & !0o777_777_777;
-                va = va | 0o777_777_776;
-                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
-            },
-            1 => unsafe {
-                let idx = (va >> 18) & 0o000_777_777;
-                va = va & !0o777_777_000;
-                va = va | 0o777_777_000 | idx;
-                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
-            },
-            2 => unsafe {
-                let idx = (va >> 9) & 0o000_777_777;
-                va = va & !0o777_000_000;
-                va = va | 0o777_000_000 | idx;
-                core::slice::from_raw_parts_mut((va << PAGE_SIZE_BITS) as *mut PageTableEntry, 512)
-            },
+        let mut vp: usize = (*self).into();
+        let vp = match level {
+            0 => {
+                vp = !0o777_777_777 | 0o777_777_776;
+                vp
+            }
+            1 => {
+                let idx = (vp >> 18) & 0o000_000_777;
+                vp = !0o777_777_777 | 0o777_777_000 | idx;
+                vp
+            }
+            2 => {
+                let idx = (vp >> 9) & 0o000_777_777;
+                vp = !0o777_777_777 | 0o777_000_000 | idx;
+                vp
+            }
             _ => panic!("get_pte_array: level {level} not supported"),
-        }
+        };
+
+        let addr = (vp << PAGE_SIZE_BITS) as *mut PageTableEntry;
+        // println!("\t pte addr {:#o}", addr as usize);
+        unsafe { core::slice::from_raw_parts_mut(addr, 512) }
     }
 }
 

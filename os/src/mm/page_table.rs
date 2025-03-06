@@ -77,23 +77,20 @@ impl PageTable {
         };
         let entries = kernel_pt.root_ppn.get_pte_array();
         kernel_pt.root_ppn.get_bytes_array().fill(0);
-        let l1ppn = frame_alloc().unwrap();
-        l1ppn.get_bytes_array().fill(0);
 
         // Place the root ppn to the last entry of the root PTD to achieve self-mapping.
         entries[510] =
             PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
         entries[511] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V);
 
-        let skernel = VirtAddr::from(linker_args::skernel as usize);
-        let spage = VirtPageNum::from(skernel);
-        let idx = spage.indexes();
-        // Assume the maximum memory is 1G, so only create 1 level-1 PTD.
-        entries[idx[0]] = PageTableEntry::new(l1ppn, PTEFlags::V);
-
-        let kstack_ppn = frame_alloc().unwrap();
-        kstack_ppn.get_bytes_array().fill(0);
-        entries[508] = PageTableEntry::new(kstack_ppn, PTEFlags::V);
+        // let l1ppn = frame_alloc().unwrap();
+        // l1ppn.get_bytes_array().fill(0);
+        // let skernel = VirtAddr::from(linker_args::skernel as usize);
+        // let spage = VirtPageNum::from(skernel);
+        // let idx = spage.indexes();
+        // println!("\tlevel 1 idx {}", idx[0]);
+        // // Assume the maximum memory is 1G, so only create 1 level-1 PTD.
+        // entries[idx[0]] = PageTableEntry::new(l1ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
         kernel_pt
     }
 
@@ -142,20 +139,21 @@ impl PageTable {
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in idxs.iter().enumerate() {
-            let pte = if self.kernel_started {
+            let ptes = if self.kernel_started {
                 // println!("\tpte by vpn {} {:#x}", i, vpn.0);
-                &mut vpn.get_pte_array(i)[*idx]
+                vpn.get_pte_array(i)
             } else {
-                &mut ppn.get_pte_array()[*idx]
+                ppn.get_pte_array()
             };
+            let pte = ptes.get_mut(*idx).unwrap();
             if i == 2 {
                 result = Some(pte);
                 break;
             }
-            // println!("\t\tlevel {} {:#x}", i, pte.bits);
+            // println!("\t\tlevel {} pte {:#x} vpn {:#x}", i, pte.bits, vpn.0);
             if !pte.is_valid() {
                 if create {
-                    // println!("-----map\t{:x}\t{:x}\t{:x}", i, *idx, vpn.0);
+                    println!("-----create\t{:x}\t{}\t{:x}", i, *idx, vpn.0);
                     let frame = frame_alloc().unwrap();
                     frame.get_bytes_array().fill(0);
                     *pte = PageTableEntry::new(frame, PTEFlags::V);
@@ -191,12 +189,7 @@ impl PageTable {
         let satp = self.token();
         self.kernel_started = true;
         unsafe {
-            // satp::write(satp::Satp::from_bits(satp));
-            asm!(
-                "csrw satp, t0",
-                "sfence.vma", 
-                in("t0") satp
-            );
+            satp::write(satp::Satp::from_bits(satp));
         }
     }
 }

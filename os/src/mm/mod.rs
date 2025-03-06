@@ -32,7 +32,7 @@ pub fn init(fdt: &fdt::Fdt) {
         PhysAddr::from(mem_end).floor(),
     );
 
-    KERNEL_SPACE.lock().activate();
+    // KERNEL_SPACE.lock().activate();
     heap_allocator::init_kernel_heap(kernel_end, KERNEL_HEAP_SIZE);
     println!("kernel memory initialized");
 }
