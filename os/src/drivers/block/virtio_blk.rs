@@ -3,9 +3,9 @@ use core::{alloc::Layout, ptr::NonNull};
 use crate::{
     config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
     mm::{
-        address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum},
-        frame_allocator::{frame_alloc, frame_dealloc},
+        address::{VirtAddr, VirtPageNum},
         heap_allocator,
+        linker_args::entry_end_addr,
         memory_set::KERNEL_SPACE,
     },
     println,
@@ -60,13 +60,13 @@ impl BlockDevice for VirtIOBlock {
             Err(err) => panic!("Error when reading VirtIOBlk {:?}", err),
         };
         res
-        // .expect("Error when reading VirtIOBlk");
     }
     fn write_block(&self, block_id: usize, buf: &[u8]) {
-        self.virtio_blk
-            .lock()
-            .write_blocks(block_id, buf)
-            .expect("Error when writing VirtIOBlk");
+        let res = match self.virtio_blk.lock().write_blocks(block_id, buf) {
+            Ok(_) => (),
+            Err(err) => panic!("Error when writing VirtIOBlk {:?}", err),
+        };
+        res
     }
 }
 
@@ -79,29 +79,32 @@ unsafe impl Hal for VirtioHal {
         pages: usize,
         direction: virtio_drivers::BufferDirection,
     ) -> (virtio_drivers::PhysAddr, NonNull<u8>) {
+        let size = pages * PAGE_SIZE;
         let ptr = heap_allocator::KERNEL_HEAP_ALLOCATOR
             .lock()
-            .alloc(Layout::from_size_align(pages * PAGE_SIZE, PAGE_SIZE).unwrap())
+            .alloc(Layout::from_size_align(size, PAGE_SIZE).unwrap())
             .unwrap();
         let vaddr = VirtAddr::from(ptr.as_ptr() as usize);
+        let vpn = VirtPageNum::from(vaddr);
         println!("----[track]: {}::{} ptr {:x}", file!(), line!(), vaddr.0);
-        let pte = KERNEL_SPACE
-            .lock()
-            .get_page_table()
-            .translate(VirtPageNum::from(vaddr))
-            .unwrap();
+        let pte = KERNEL_SPACE.lock().get_page_table().translate(vpn).unwrap();
         println!("----[track]: {}::{}", file!(), line!());
         unsafe {
-            ADDR_OFF_SET = ptr.as_ptr() as usize - pte.ppn().0 << 12;
+            ADDR_OFF_SET = (ptr.as_ptr() as usize) - (pte.ppn().0 << 12);
         }
         println!("----[track]: {}::{}", file!(), line!());
         println!(
             "dma_alloc: {:x} {:x} {:x}",
-            pte.ppn().0,
+            pte.ppn().0 << 12,
             ptr.as_ptr() as usize,
             unsafe { ADDR_OFF_SET }
         );
-        (pte.ppn().0, ptr)
+
+        unsafe {
+            core::slice::from_raw_parts_mut(ptr.as_ptr(), size).fill(0);
+        }
+        println!("----[track]: {}::{}", file!(), line!());
+        (pte.ppn().0 << 12, ptr)
     }
 
     unsafe fn dma_dealloc(
@@ -109,7 +112,13 @@ unsafe impl Hal for VirtioHal {
         vaddr: NonNull<u8>,
         pages: usize,
     ) -> i32 {
-        println!("----[track]: {}::{}", file!(), line!());
+        println!(
+            "----[track]: {}::{} {:#x} {:#x}",
+            file!(),
+            line!(),
+            paddr,
+            vaddr.as_ptr() as usize
+        );
         heap_allocator::KERNEL_HEAP_ALLOCATOR.lock().dealloc(
             vaddr,
             Layout::from_size_align(pages * PAGE_SIZE, PAGE_SIZE).unwrap(),
@@ -118,11 +127,23 @@ unsafe impl Hal for VirtioHal {
     }
 
     unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> NonNull<u8> {
-        println!("----[track]: {}::{}", file!(), line!());
-        if paddr < KERNEL_SPACE_OFFSET {
+        if paddr < unsafe { entry_end_addr } {
+            println!(
+                "----[track]: {}::{} mmio_phys_to_virt: {:#x}",
+                file!(),
+                line!(),
+                paddr
+            );
             NonNull::new(paddr as *mut u8).unwrap()
         } else {
-            NonNull::new((paddr + unsafe { ADDR_OFF_SET }) as *mut u8).unwrap()
+            let vaddr = NonNull::new((paddr + unsafe { ADDR_OFF_SET }) as *mut u8).unwrap();
+            println!(
+                "----[track]: {}::{} mmio_phys_to_virt {:#x}",
+                file!(),
+                line!(),
+                vaddr.as_ptr() as usize
+            );
+            vaddr
         }
     }
 
@@ -130,12 +151,20 @@ unsafe impl Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) -> virtio_drivers::PhysAddr {
-        println!("----[track]: {}::{}", file!(), line!());
         let vaddr = buffer.as_ptr() as *mut u8 as usize;
         if vaddr < KERNEL_SPACE_OFFSET {
+            println!("----[track]: {}::{} {:#x}", file!(), line!(), vaddr);
             vaddr
         } else {
-            vaddr - unsafe { ADDR_OFF_SET }
+            let paddr = vaddr - unsafe { ADDR_OFF_SET };
+            println!(
+                "----[track]: {}::{} {:#x} {:#x}",
+                file!(),
+                line!(),
+                vaddr,
+                paddr
+            );
+            paddr
         }
     }
 

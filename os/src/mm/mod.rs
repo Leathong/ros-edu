@@ -3,7 +3,7 @@ pub(crate) mod frame_allocator;
 pub(crate) mod heap_allocator;
 pub(crate) mod page_table;
 pub(crate) mod memory_set;
-mod linker_args;
+pub(crate) mod linker_args;
 
 pub use page_table::UserBuffer;
 
@@ -32,7 +32,7 @@ pub fn init(fdt: &fdt::Fdt) {
         PhysAddr::from(mem_end).floor(),
     );
 
-    // KERNEL_SPACE.lock().activate();
+    KERNEL_SPACE.lock().activate();
     heap_allocator::init_kernel_heap(kernel_end, KERNEL_HEAP_SIZE);
     println!("kernel memory initialized");
 }

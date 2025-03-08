@@ -5,6 +5,7 @@
 
 extern crate alloc;
 
+mod logger;
 mod console;
 mod config;
 mod mm;
@@ -26,6 +27,7 @@ global_asm!(include_str!("entry.asm"));
 
 #[unsafe(no_mangle)]
 pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
+    // let _ = logger::init();
     trap::init();
 
     let fdt = parse_dtb(dtb_addr);
@@ -34,6 +36,7 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
+
     fs::list_apps();
     task::add_initproc();
 

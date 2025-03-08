@@ -7,7 +7,6 @@ pub const CONS_1M: usize = 0x0010_0000;
 
 pub const USER_STACK_SIZE: usize = CONS_4K * 16;
 pub const KERNEL_STACK_SIZE: usize = CONS_4K * 16;
-pub const KERNEL_HEAP_SIZE: usize = 3 * CONS_1M;
 pub const PAGE_SIZE: usize = CONS_4K;
 pub const PAGE_SIZE_BITS: usize = 12;
 

@@ -1,4 +1,4 @@
-use core::arch::asm;
+use core::arch::{asm, global_asm};
 
 use crate::mm::address::PhysPageNum;
 use crate::mm::{address::VirtPageNum, frame_allocator::frame_alloc};
@@ -9,6 +9,8 @@ use riscv::register::satp;
 
 use super::address::VirtAddr;
 use super::linker_args;
+
+global_asm!(include_str!("switch_env.S"));
 
 bitflags! {
     /// page table entry flags
@@ -63,7 +65,12 @@ impl PageTableEntry {
 /// page table structure
 pub struct PageTable {
     root_ppn: PhysPageNum,
-    kernel_started: bool,
+    asid: usize,
+}
+
+unsafe extern "C" {
+    fn _ptenv_switch();
+    fn _ptenv_restore();
 }
 
 const TEMP_PAGE_ADDR: usize = (0o777_777_775 << 12) | !(1 << 39 - 1);
@@ -73,32 +80,18 @@ impl PageTable {
     pub fn new_kernel() -> Self {
         let kernel_pt = PageTable {
             root_ppn: frame_alloc().unwrap(),
-            kernel_started: false,
+            asid: 1,
         };
         let entries = kernel_pt.root_ppn.get_pte_array();
         kernel_pt.root_ppn.get_bytes_array().fill(0);
 
-        // Place the root ppn to the last entry of the root PTD to achieve self-mapping.
-        entries[510] =
-            PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
-        entries[511] = PageTableEntry::new(kernel_pt.root_ppn, PTEFlags::V);
-
-        // let l1ppn = frame_alloc().unwrap();
-        // l1ppn.get_bytes_array().fill(0);
-        // let skernel = VirtAddr::from(linker_args::skernel as usize);
-        // let spage = VirtPageNum::from(skernel);
-        // let idx = spage.indexes();
-        // println!("\tlevel 1 idx {}", idx[0]);
-        // // Assume the maximum memory is 1G, so only create 1 level-1 PTD.
-        // entries[idx[0]] = PageTableEntry::new(l1ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
         kernel_pt
     }
 
-    pub fn spawn(&self) -> Self {
-        debug_assert!(self.kernel_started);
+    pub fn spawn(&self, asid: usize) -> Self {
         let pt = PageTable {
             root_ppn: frame_alloc().unwrap(),
-            kernel_started: true,
+            asid: asid,
         };
 
         // copy kernel space to the new page table
@@ -126,25 +119,20 @@ impl PageTable {
         }
     }
 
-    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        self.find_or_crate_pte(vpn, false)
+    fn find_pte(root_ppn: PhysPageNum, vpn: VirtPageNum) -> Option<&'static mut PageTableEntry> {
+        Self::find_or_crate_pte(root_ppn, vpn, false)
     }
 
-    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        self.find_or_crate_pte(vpn, true)
+    fn find_pte_create(root_ppn: PhysPageNum, vpn: VirtPageNum) -> Option<&'static mut PageTableEntry> {
+        Self::find_or_crate_pte(root_ppn, vpn, true)
     }
 
-    fn find_or_crate_pte(&self, vpn: VirtPageNum, create: bool) -> Option<&mut PageTableEntry> {
+    fn find_or_crate_pte(root_ppn: PhysPageNum, vpn: VirtPageNum, create: bool) -> Option<&'static mut PageTableEntry> {
         let idxs = vpn.indexes();
-        let mut ppn = self.root_ppn;
+        let mut ppn = root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in idxs.iter().enumerate() {
-            let ptes = if self.kernel_started {
-                // println!("\tpte by vpn {} {:#x}", i, vpn.0);
-                vpn.get_pte_array(i)
-            } else {
-                ppn.get_pte_array()
-            };
+            let ptes = ppn.get_pte_array();
             let pte = ptes.get_mut(*idx).unwrap();
             if i == 2 {
                 result = Some(pte);
@@ -153,7 +141,7 @@ impl PageTable {
             // println!("\t\tlevel {} pte {:#x} vpn {:#x}", i, pte.bits, vpn.0);
             if !pte.is_valid() {
                 if create {
-                    println!("-----create\t{:x}\t{}\t{:x}", i, *idx, vpn.0);
+                    // println!("-----create\t{:x}\t{}\t{:x}", i, *idx, vpn.0);
                     let frame = frame_alloc().unwrap();
                     frame.get_bytes_array().fill(0);
                     *pte = PageTableEntry::new(frame, PTEFlags::V);
@@ -167,27 +155,62 @@ impl PageTable {
     }
 
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let pte = self.find_pte_create(vpn).unwrap();
+        let mut root_ppn = self.root_ppn.0;
+        unsafe {
+            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
+            _ptenv_switch();
+        }
+        // println!("lalalalal");
+        Self::map_internal(PhysPageNum::from(root_ppn), vpn, ppn, flags);
+        unsafe {
+            _ptenv_restore();
+        }
+    }
+
+    fn map_internal(root_ppn: PhysPageNum, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        let pte = Self::find_pte_create(root_ppn, vpn).unwrap();
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
         // println!("--- map {:x} to {:x}", vpn.0, ppn.0)
     }
 
     pub fn unmap(&mut self, vpn: VirtPageNum) {
-        let pte = self.find_pte(vpn).unwrap();
+        let mut root_ppn = self.root_ppn.0;
+        unsafe {
+            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
+            _ptenv_switch();
+        }
+        Self::unmap_internal(PhysPageNum::from(root_ppn), vpn);
+        unsafe {
+            _ptenv_restore();
+        }
+    }
+
+    fn unmap_internal(root_ppn: PhysPageNum, vpn: VirtPageNum) {
+        let pte = Self::find_pte(root_ppn, vpn).unwrap();
         assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
         *pte = PageTableEntry::empty();
     }
+
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
-        self.find_pte(vpn).map(|pte| *pte)
+        let mut root_ppn = self.root_ppn.0;
+        unsafe {
+            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
+            _ptenv_switch();
+        }
+        let res = Self::find_pte(PhysPageNum::from(root_ppn), vpn).map(|pte| *pte);
+        unsafe {
+            _ptenv_restore();
+        }
+        res
     }
     pub fn token(&self) -> usize {
-        0b1000usize << 60 | self.root_ppn.0
+        assert!(self.asid < 1 << 16, "asid overflow {:#x}", self.asid);
+        0b1000usize << 60 | self.root_ppn.0 | self.asid << 44
     }
 
     pub fn active(&mut self) {
         let satp = self.token();
-        self.kernel_started = true;
         unsafe {
             satp::write(satp::Satp::from_bits(satp));
         }

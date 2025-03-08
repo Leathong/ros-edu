@@ -77,12 +77,13 @@ impl Task {
 
             schedule::exit_current();
         }
-        let mut pt = KERNEL_SPACE.lock().get_page_table().spawn();
+
+        let pid_handle = pid_alloc();
+        let mut pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
         pt.active();
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data, pt);
-        // alloc a pid and a kernel stack in kernel space
-        let pid_handle = pid_alloc();
+        
         let kernel_stack = KernelStack::new();
         let kernel_stack_top = kernel_stack.area.vpn_range.get_end().0 << 12;
         let mut user_ctx = UserContext::default();

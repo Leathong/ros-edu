@@ -15,10 +15,12 @@ MEMORY {
 SECTIONS
 {
     . = BASE_ADDRESS;
+    sentry = .;
     .text.entry : {
         *(.text.entry)
         . = ALIGN(4K);
     } AT>BOOT 
+    eentry = .;
 
     . = KERNEL_START_ADDR;
     skernel = .;

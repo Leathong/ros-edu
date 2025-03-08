@@ -8,30 +8,34 @@ _start:
     mv sp, t0
 
     call _init_page_table
+    sfence.vma
 
     # load main function address
     la t0, ros_main_addr
     ld t0, 0(t0)
 
+    # clear frame pointer
     li s0, 0
     # jump to main
-    jalr ra, t0, 0 
+    jalr ra, 0(t0) 
 
+    .globl _init_page_table
 _init_page_table:
     # load page table
-    la t0, tmp_page_table
+    la t0, identical_map_pt
     srli t0, t0, 12      
     li t1, (0x8 << 60)   
     or t0, t0, t1   
     csrw satp, t0
-    sfence.vma
     ret
 stack_addr:
     .dword boot_stack_top
 ros_main_addr:
     .dword ros_main
+
     .align 12
-tmp_page_table:
+    .global identical_map_pt
+identical_map_pt:
     .set n, 0
     .rept 256
         .dword (n << 28) | PERMISSION_XRWV
@@ -45,8 +49,21 @@ tmp_page_table:
 
     .section .bss.stack
     .globl boot_stack_lower_bound
+mapping_page_stack:
+    .space 4096 * 4
+    .global mapping_page_stack_top   
+mapping_page_stack_top:
+     
 boot_stack_lower_bound:
     .space 4096 * 16
     .globl boot_stack_top
 boot_stack_top:
+
+    .section .data.addr
+    .global entry_start_addr
+entry_start_addr:
+    .dword sentry
+    .global entry_end_addr
+entry_end_addr:
+    .dword eentry
 

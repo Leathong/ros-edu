@@ -10,4 +10,7 @@ unsafe extern "C" {
     pub fn sbss();
     pub fn ebss();
     pub fn ekernel();
+
+    pub static entry_start_addr: usize;
+    pub static entry_end_addr: usize;
 }

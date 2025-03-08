@@ -65,6 +65,8 @@
 			"args": [
 				"-d",
 				"page,cpu_reset,guest_errors",
+				"-D",
+				"qemu.log",
 				"-machine",
 				"virt",
 				"-nographic",

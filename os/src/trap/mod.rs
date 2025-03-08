@@ -3,7 +3,7 @@ pub mod context;
 use core::arch::{asm, global_asm, naked_asm};
 
 use context::TrapFrame;
-use riscv::register::{scause, sepc, sie, stval, stvec};
+use riscv::register::{satp::{self, Satp}, scause, sepc, sie, stval, stvec};
 
 use crate::{lang_items::print_backtrace, println, sbi::shutdown};
 
@@ -37,10 +37,11 @@ fn trap_handler(trapframe: &TrapFrame) -> ! {
     let stval = stval::read();
 
     println!(
-        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x}",
+        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x} satp: {:#x}",
         scause.bits(),
         stval,
-        sepc::read()
+        sepc::read(),
+        satp::read().bits(),
     );
     unsafe {
         print_backtrace(trapframe.general.s0);

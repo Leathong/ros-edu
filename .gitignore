@@ -4,3 +4,4 @@ vendor/
 **/toolchain
 
 crash.txt
+qemu.log

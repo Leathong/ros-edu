@@ -7,6 +7,12 @@ pub struct ProcessId {
     pub value: usize,
 }
 
+impl Drop for ProcessId {
+    fn drop(&mut self) {
+        PID_ALLOCATOR.lock().dealloc(self.value);
+    }
+}
+
 pub struct PidAllocator {
     current: usize,
     recycled: Vec<usize>,

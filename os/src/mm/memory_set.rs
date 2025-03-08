@@ -5,12 +5,12 @@ use super::address::{StepByOne, VPNRange};
 use super::frame_allocator::frame_alloc;
 use super::linker_args::*;
 use super::page_table::{PTEFlags, PageTable};
-use crate::config::{self, KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
 use crate::config::MMIO;
+use crate::config::{self, KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
+use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
-use crate::println;
 use spin::Mutex;
 
 lazy_static! {
@@ -49,13 +49,33 @@ impl MemorySet {
         let mut memory_set = Self::new(PageTable::new_kernel());
 
         // map kernel sections
+        unsafe {
+            println!(
+                ".text.boot\t[{:#x}, {:#x})",
+                entry_start_addr, entry_end_addr
+            );
+        }
         println!(".text\t[{:#x}, {:#x})", stext as usize, etext as usize);
-        println!(".rodata\t[{:#x}, {:#x})", srodata as usize, erodata as usize);
+        println!(
+            ".rodata\t[{:#x}, {:#x})",
+            srodata as usize, erodata as usize
+        );
         println!(".data\t[{:#x}, {:#x})", sdata as usize, edata as usize);
         println!(
             ".bss\t[{:#x}, {:#x})",
             sbss_with_stack as usize, ebss as usize
         );
+        println!("mapping .text section");
+        let mut entry_area = unsafe {
+             MapArea::new(
+                entry_start_addr.into(),
+                entry_end_addr.into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::X,
+            )
+        };
+        entry_area.map(&mut memory_set.page_table);
+
         println!("mapping .text section");
         let mut text_area = MapArea::new(
             (stext as usize).into(),
@@ -245,18 +265,17 @@ impl MapArea {
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
+        println!("----[track]: {}::{} copy data", file!(), line!());
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();
         let len = data.len();
         loop {
             let src = &data[start..len.min(start + PAGE_SIZE)];
-            let dst = &mut page_table
-                .translate(current_vpn)
-                .unwrap()
-                .ppn()
-                .get_bytes_array()[..src.len()];
-            dst.copy_from_slice(src);
+            let dst = (current_vpn.0 << 12) as *mut u8;
+            unsafe {
+                core::slice::from_raw_parts_mut(dst, PAGE_SIZE).copy_from_slice(src);
+            };
             start += PAGE_SIZE;
             if start >= len {
                 break;
@@ -283,34 +302,4 @@ bitflags! {
         const X = 1 << 3;
         const U = 1 << 4;
     }
-}
-
-#[allow(unused)]
-pub fn remap_test() {
-    let mut kernel_space = KERNEL_SPACE.lock();
-    let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
-    let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
-    let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
-    assert!(
-        !kernel_space
-            .page_table
-            .translate(mid_text.floor())
-            .unwrap()
-            .writable(),
-    );
-    assert!(
-        !kernel_space
-            .page_table
-            .translate(mid_rodata.floor())
-            .unwrap()
-            .writable(),
-    );
-    assert!(
-        !kernel_space
-            .page_table
-            .translate(mid_data.floor())
-            .unwrap()
-            .executable(),
-    );
-    println!("remap_test passed!");
 }
