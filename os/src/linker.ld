@@ -24,39 +24,39 @@ SECTIONS
 
     . = KERNEL_START_ADDR;
     skernel = .;
-    stext = .;
     .text : {
+        stext = .;
         *(.text .text.*)
+        . = ALIGN(4K);
+        etext = .;
     } >RAM AT>FLASH 
-    . = ALIGN(4K);
-    etext = .;
     
-    srodata = .;
     .rodata : {
+        srodata = .;
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
+        . = ALIGN(4K);
+        erodata = .;
     } >RAM AT>FLASH 
-    . = ALIGN(4K);
-    erodata = .;
 
-    sdata = .;
     .data : {
+        sdata = .;
         *(.data .data.*)
         *(.sdata .sdata.*)
+        . = ALIGN(4K);
+        edata = .;
     } >RAM AT>FLASH 
-    . = ALIGN(4K);
-    edata = .;
 
-    sbss_with_stack = .;
     .bss : {
+        sbss_with_stack = .;
         *(.bss.stack)
         . = ALIGN(4K);
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
+        . = ALIGN(4K);
+        ebss = .;
     } >RAM AT>FLASH 
-    . = ALIGN(4K);
-    ebss = .;
     ekernel = .;
 
     /DISCARD/ : {

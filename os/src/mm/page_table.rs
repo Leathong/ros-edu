@@ -82,9 +82,7 @@ impl PageTable {
             root_ppn: frame_alloc().unwrap(),
             asid: 1,
         };
-        let entries = kernel_pt.root_ppn.get_pte_array();
         kernel_pt.root_ppn.get_bytes_array().fill(0);
-
         kernel_pt
     }
 

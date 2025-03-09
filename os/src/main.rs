@@ -27,11 +27,12 @@ global_asm!(include_str!("entry.asm"));
 
 #[unsafe(no_mangle)]
 pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
-    // let _ = logger::init();
     trap::init();
 
     let fdt = parse_dtb(dtb_addr);
     mm::init(&fdt);
+
+    let _ = logger::init();
 
     trap::init();
     trap::enable_timer_interrupt();

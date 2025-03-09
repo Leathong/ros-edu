@@ -4,7 +4,7 @@ import argparse
 
 def extract_addresses(line):
     # 使用正则表达式提取 ra 后面的地址
-    match = re.search(r'(^\s*\d{1,3}:)\s+.+ra:\s+(0x[0-9a-fA-F]+)', line)
+    match = re.search(r'(^\s*\d{1,3}:)\s+\s+(0x[0-9a-fA-F]+)', line)
     if match:
         return match
     return None
