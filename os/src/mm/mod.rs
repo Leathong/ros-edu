@@ -5,15 +5,19 @@ pub(crate) mod page_table;
 pub(crate) mod memory_set;
 pub(crate) mod linker_args;
 
+use fdt::Fdt;
 pub use page_table::UserBuffer;
 
 use address::PhysAddr;
-use memory_set::KERNEL_SPACE;
+use memory_set::{init_kernel_space, KERNEL_SPACE};
 use crate::println;
 
 use crate::config::{KERNEL_HEAP_SIZE, KERNEL_SPACE_OFFSET, PAGE_SIZE_BITS};
 
-pub fn init(fdt: &fdt::Fdt) {
+pub fn init(dtb_addr: usize) -> Fdt<'static> {
+    println!("device tree @ {:#x}", dtb_addr);
+    // Safe because the pointer is a valid pointer to unaliased memory.
+    let fdt = unsafe { Fdt::from_ptr(dtb_addr as *const u8).unwrap() };
     clear_bss();
     let mem_reg = fdt.memory().regions().next().unwrap();
     let mem_start = mem_reg.starting_address as usize;
@@ -32,9 +36,12 @@ pub fn init(fdt: &fdt::Fdt) {
         PhysAddr::from(mem_end).floor(),
     );
 
+    init_kernel_space(dtb_addr, mem_end);
     KERNEL_SPACE.lock().activate();
     heap_allocator::init_kernel_heap(kernel_end, KERNEL_HEAP_SIZE);
     println!("kernel memory initialized");
+
+    fdt
 }
 
 fn clear_bss() {

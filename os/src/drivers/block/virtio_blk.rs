@@ -2,6 +2,7 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
     config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
+    drivers::block::BLOCK_DEVICE_INNER,
     mm::{
         address::{VirtAddr, VirtPageNum},
         heap_allocator,
@@ -9,54 +10,54 @@ use crate::{
         memory_set::KERNEL_SPACE,
     },
 };
+use alloc::sync::Arc;
 use easy_fs::BlockDevice;
 use spin::Mutex;
 use virtio_drivers::{
     Hal,
     device::blk::VirtIOBlk,
     transport::{
-        Transport,
+        DeviceType, Transport,
         mmio::{MmioTransport, VirtIOHeader},
     },
 };
 
 use log::info;
 
-#[allow(unused)]
-const VIRTIO0: usize = 0x10001000;
-
-pub struct VirtIOBlock {
-    virtio_blk: Mutex<VirtIOBlk<VirtioHal, MmioTransport>>,
-}
-
-impl VirtIOBlock {
-    #[allow(unused)]
-    pub fn new() -> Self {
-        unsafe {
-            let header = NonNull::new(VIRTIO0 as *mut VirtIOHeader).unwrap();
-            let size = 0x1000;
-            match MmioTransport::new(header, size) {
-                Err(e) => panic!("Error creating VirtIO MMIO transport: {}", e),
-                Ok(transport) => {
+pub fn init_blk(addr: usize, size: usize) {
+    let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
+    unsafe {
+        match MmioTransport::new(header, size) {
+            Err(e) => {
+                info!("Error creating VirtIO MMIO transport: {}", e);
+                return;
+            },
+            Ok(transport) => match transport.device_type() {
+                DeviceType::Block => {
                     info!(
                         "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}",
                         transport.vendor_id(),
                         transport.device_type(),
                         transport.version(),
                     );
-                    let mut blk = match VirtIOBlk::new(transport) {
-                        Ok(blk) => blk,
+
+                    BLOCK_DEVICE_INNER.call_once(|| match VirtIOBlk::new(transport) {
+                        Ok(blk) => Arc::new(VirtIOBlock {
+                            virtio_blk: Mutex::new(blk),
+                        }),
                         Err(e) => {
                             panic!("Failed to create virtio blk: {}", e);
                         }
-                    };
-                    VirtIOBlock {
-                        virtio_blk: Mutex::new(blk),
-                    }
+                    });
                 }
-            }
+                _ => return,
+            },
         }
     }
+}
+
+pub struct VirtIOBlock {
+    virtio_blk: Mutex<VirtIOBlk<VirtioHal, MmioTransport>>,
 }
 
 impl BlockDevice for VirtIOBlock {

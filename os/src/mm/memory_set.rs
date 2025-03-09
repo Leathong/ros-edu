@@ -1,5 +1,7 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
 
+use core::ptr;
+
 use super::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::address::{StepByOne, VPNRange};
 use super::frame_allocator::frame_alloc;
@@ -11,12 +13,19 @@ use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
-use spin::Mutex;
+use spin::{Mutex, Once};
+
+static KERNEL_SPACE_INNER: Once<Mutex<MemorySet>> = Once::new();
 
 lazy_static! {
     /// a memory set instance through lazy_static! managing kernel space
-    pub static ref KERNEL_SPACE: Mutex<MemorySet> =
-        Mutex::new(MemorySet::new_kernel());
+    pub static ref KERNEL_SPACE: Mutex<MemorySet> = unsafe {
+        ptr::read(KERNEL_SPACE_INNER.get().unwrap())
+    };
+}
+
+pub fn init_kernel_space(dtb_addr: usize, mem_end: usize) {
+    KERNEL_SPACE_INNER.call_once(|| Mutex::new(MemorySet::new_kernel(dtb_addr, mem_end)));
 }
 
 /// memory set structure, controls virtual-memory space
@@ -45,7 +54,7 @@ impl MemorySet {
         self.areas.push(map_area);
     }
     /// Without kernel stacks.
-    pub fn new_kernel() -> Self {
+    pub fn new_kernel(dtb_addr: usize, mem_end: usize) -> Self {
         let mut memory_set = Self::new(PageTable::new_kernel());
 
         // map kernel sections
@@ -67,7 +76,7 @@ impl MemorySet {
         );
         println!("mapping .text section");
         let mut entry_area = unsafe {
-             MapArea::new(
+            MapArea::new(
                 entry_start_addr.into(),
                 entry_end_addr.into(),
                 MapType::Identical,
@@ -75,6 +84,15 @@ impl MemorySet {
             )
         };
         entry_area.map(&mut memory_set.page_table);
+
+        println!("mapping dtb");
+        let mut dtb_area = MapArea::new(
+            dtb_addr.into(),
+            mem_end.into(),
+            MapType::Identical,
+            MapPermission::R | MapPermission::X,
+        );
+        dtb_area.map(&mut memory_set.page_table);
 
         println!("mapping .text section");
         let mut text_area = MapArea::new(
