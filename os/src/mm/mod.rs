@@ -1,18 +1,18 @@
 pub(crate) mod address;
 pub(crate) mod frame_allocator;
 pub(crate) mod heap_allocator;
-pub(crate) mod page_table;
-pub(crate) mod memory_set;
 pub(crate) mod linker_args;
+pub(crate) mod memory_set;
+pub(crate) mod page_table;
 
 use fdt::Fdt;
 pub use page_table::UserBuffer;
 
-use address::PhysAddr;
-use memory_set::{init_kernel_space, KERNEL_SPACE};
 use crate::println;
+use address::PhysAddr;
+use memory_set::{KERNEL_SPACE, init_kernel_space};
 
-use crate::config::{KERNEL_HEAP_SIZE, KERNEL_SPACE_OFFSET, PAGE_SIZE_BITS};
+use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE_BITS};
 
 pub fn init(dtb_addr: usize) -> Fdt<'static> {
     println!("device tree @ {:#x}", dtb_addr);
@@ -35,10 +35,10 @@ pub fn init(dtb_addr: usize) -> Fdt<'static> {
         PhysAddr::from(kernel_end - KERNEL_SPACE_OFFSET).into(),
         PhysAddr::from(mem_end).floor(),
     );
-
     init_kernel_space(dtb_addr, mem_end);
     KERNEL_SPACE.lock().activate();
-    heap_allocator::init_kernel_heap(kernel_end, KERNEL_HEAP_SIZE);
+
+    heap_allocator::init_kernel_heap();
     println!("kernel memory initialized");
 
     fdt

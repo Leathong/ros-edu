@@ -71,11 +71,18 @@
 				"virt",
 				"-nographic",
 				"-bios",
+
+				// "default",
+				// "-kernel",
+				// "${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
 				"${workspaceFolder}/os/bootloader/rustsbi-qemu.bin",
 				"-device",
 				"loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000",
+
+				"-global",
+				"virtio-mmio.force-legacy=false",
 				"-drive",
-				"file=${workspaceFolder}/os/fs.img,if=none,format=raw,id=x0",
+				"file=${workspaceFolder}/easy_fs_fuse/target/fs.img,if=none,format=raw,id=x0",
 				"-device",
 				"virtio-blk-device,drive=x0",
 			]
@@ -102,7 +109,31 @@
 					"endsPattern": "^CPU Reset.*"
 				}
 			},
-			"command": "qemu-system-riscv64 -d page,cpu_reset,guest_errors -machine virt -nographic -bios ${workspaceFolder}/os/bootloader/rustsbi-qemu.bin -device loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000 -s -S"
+			"command": "qemu-system-riscv64",
+			"args": [
+				"-d",
+				"page,cpu_reset,guest_errors",
+				"-machine",
+				"virt",
+				"-nographic",
+				"-bios",
+
+				// "default",
+				// "-kernel",
+				// "${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin",
+				"${workspaceFolder}/os/bootloader/rustsbi-qemu.bin",
+				"-device",
+				"loader,file=${workspaceFolder}/target/riscv64gc-unknown-none-elf/debug/os.bin,addr=0x80200000",
+
+				"-global",
+				"virtio-mmio.force-legacy=false",
+				"-drive",
+				"file=${workspaceFolder}/easy_fs_fuse/target/fs.img,if=none,format=raw,id=x0",
+				"-device",
+				"virtio-blk-device,drive=x0",
+				"-s",
+				"-S",
+			]
 		}
 	]
 }

@@ -8,11 +8,12 @@ use super::frame_allocator::frame_alloc;
 use super::linker_args::*;
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::MMIO;
-use crate::config::{self, KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
+use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
 use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
+use log::info;
 use spin::{Mutex, Once};
 
 static KERNEL_SPACE_INNER: Once<Mutex<MemorySet>> = Once::new();
@@ -49,7 +50,7 @@ impl MemorySet {
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
-            map_area.copy_data(&mut self.page_table, data);
+            map_area.copy_data(data);
         }
         self.areas.push(map_area);
     }
@@ -58,12 +59,6 @@ impl MemorySet {
         let mut memory_set = Self::new(PageTable::new_kernel());
 
         // map kernel sections
-        unsafe {
-            println!(
-                ".text.boot\t[{:#x}, {:#x})",
-                entry_start_addr, entry_end_addr
-            );
-        }
         println!(".text\t[{:#x}, {:#x})", stext as usize, etext as usize);
         println!(
             ".rodata\t[{:#x}, {:#x})",
@@ -74,16 +69,6 @@ impl MemorySet {
             ".bss\t[{:#x}, {:#x})",
             sbss_with_stack as usize, ebss as usize
         );
-        println!("mapping .text section");
-        let mut entry_area = unsafe {
-            MapArea::new(
-                entry_start_addr.into(),
-                entry_end_addr.into(),
-                MapType::Identical,
-                MapPermission::R | MapPermission::X,
-            )
-        };
-        entry_area.map(&mut memory_set.page_table);
 
         println!("mapping dtb");
         let mut dtb_area = MapArea::new(
@@ -121,6 +106,7 @@ impl MemorySet {
             MapPermission::R,
         );
         rodata_area.map(&mut memory_set.page_table);
+
         println!("mapping .data section");
         let mut data_area = MapArea::new(
             (sdata as usize).into(),
@@ -129,6 +115,7 @@ impl MemorySet {
             MapPermission::R | MapPermission::W,
         );
         data_area.map(&mut memory_set.page_table);
+
         println!("mapping .bss section");
         let mut bss_area = MapArea::new(
             (sbss_with_stack as usize).into(),
@@ -137,14 +124,13 @@ impl MemorySet {
             MapPermission::R | MapPermission::W,
         );
         bss_area.map(&mut memory_set.page_table);
-        println!("mapping kernel heap area");
-        let mut heap_area = MapArea::new(
-            (ekernel as usize).into(),
-            (ekernel as usize + config::KERNEL_HEAP_SIZE).into(),
-            MapType::Framed,
-            MapPermission::R | MapPermission::W,
-        );
-        heap_area.map(&mut memory_set.page_table);
+
+        memory_set.map_hard_ware();
+
+        memory_set
+    }
+
+    pub fn map_hard_ware(&mut self) {
         println!("mapping memory-mapped registers");
         for pair in MMIO {
             let mut mmio_area = MapArea::new(
@@ -153,15 +139,15 @@ impl MemorySet {
                 MapType::Identical,
                 MapPermission::R | MapPermission::W,
             );
-            mmio_area.map(&mut memory_set.page_table);
+            mmio_area.map(&mut self.page_table);
         }
-        memory_set
     }
 
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
     pub fn from_elf(elf_data: &[u8], new_pt: PageTable) -> (Self, usize, usize) {
         let mut memory_set = Self::new(new_pt);
+        memory_set.map_hard_ware();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -169,6 +155,8 @@ impl MemorySet {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
+        memory_set.activate();
+        info!("token {:#x}", memory_set.page_table.token());
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -187,6 +175,8 @@ impl MemorySet {
                 }
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
                 max_end_vpn = map_area.vpn_range.get_end();
+
+                info!("{:?}", ph);
                 memory_set.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
@@ -282,8 +272,8 @@ impl MapArea {
     }
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
-    pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
-        println!("----[track]: {}::{} copy data", file!(), line!());
+    pub fn copy_data(&mut self, data: &[u8]) {
+        println!("[Info]: {}::{} copy data", file!(), line!());
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();
@@ -292,7 +282,7 @@ impl MapArea {
             let src = &data[start..len.min(start + PAGE_SIZE)];
             let dst = (current_vpn.0 << 12) as *mut u8;
             unsafe {
-                core::slice::from_raw_parts_mut(dst, PAGE_SIZE).copy_from_slice(src);
+                core::slice::from_raw_parts_mut(dst, src.len()).copy_from_slice(src);
             };
             start += PAGE_SIZE;
             if start >= len {

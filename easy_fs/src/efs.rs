@@ -5,6 +5,7 @@ use super::{
 use crate::BLOCK_SZ;
 use alloc::sync::Arc;
 use spin::Mutex;
+use log::info;
 ///An easy file system on block
 pub struct EasyFileSystem {
     ///Real device
@@ -87,6 +88,7 @@ impl EasyFileSystem {
         get_block_cache(0, Arc::clone(&block_device))
             .lock()
             .read(0, |super_block: &SuperBlock| {
+                info!("Easy File System magic: {:#x}", unsafe {*((super_block as *const SuperBlock) as *const usize) });
                 assert!(super_block.is_valid(), "Error loading EFS!");
                 let inode_total_blocks =
                     super_block.inode_bitmap_blocks + super_block.inode_area_blocks;

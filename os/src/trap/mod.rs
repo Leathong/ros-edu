@@ -1,13 +1,14 @@
 pub mod context;
 
-use core::arch::{asm, global_asm, naked_asm};
+use core::arch::global_asm;
 
 use context::TrapFrame;
-use riscv::register::{satp::{self, Satp}, scause, sepc, sie, stval, stvec};
+use riscv::register::{
+    satp::{self},
+    scause, sepc, sie, stval, stvec,
+};
 
 use crate::{lang_items::print_backtrace, println, sbi::shutdown};
-
-const XLENB: usize = 8;
 
 global_asm!(include_str!("trap.S"));
 

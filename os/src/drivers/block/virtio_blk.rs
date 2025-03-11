@@ -1,12 +1,11 @@
 use core::{alloc::Layout, ptr::NonNull};
 
 use crate::{
-    config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
+    config::PAGE_SIZE,
     drivers::block::BLOCK_DEVICE_INNER,
     mm::{
         address::{VirtAddr, VirtPageNum},
         heap_allocator,
-        linker_args::entry_end_addr,
         memory_set::KERNEL_SPACE,
     },
 };
@@ -16,44 +15,27 @@ use spin::Mutex;
 use virtio_drivers::{
     Hal,
     device::blk::VirtIOBlk,
-    transport::{
-        DeviceType, Transport,
-        mmio::{MmioTransport, VirtIOHeader},
-    },
+    transport::{Transport, mmio::MmioTransport},
 };
 
-use log::info;
+use log::trace;
 
-pub fn init_blk(addr: usize, size: usize) {
-    let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
-    unsafe {
-        match MmioTransport::new(header, size) {
-            Err(e) => {
-                info!("Error creating VirtIO MMIO transport: {}", e);
-                return;
-            },
-            Ok(transport) => match transport.device_type() {
-                DeviceType::Block => {
-                    info!(
-                        "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}",
-                        transport.vendor_id(),
-                        transport.device_type(),
-                        transport.version(),
-                    );
+pub fn init_blk(transport: MmioTransport) {
+    trace!(
+        "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}",
+        transport.vendor_id(),
+        transport.device_type(),
+        transport.version(),
+    );
 
-                    BLOCK_DEVICE_INNER.call_once(|| match VirtIOBlk::new(transport) {
-                        Ok(blk) => Arc::new(VirtIOBlock {
-                            virtio_blk: Mutex::new(blk),
-                        }),
-                        Err(e) => {
-                            panic!("Failed to create virtio blk: {}", e);
-                        }
-                    });
-                }
-                _ => return,
-            },
+    BLOCK_DEVICE_INNER.call_once(|| match VirtIOBlk::new(transport) {
+        Ok(blk) => Arc::new(VirtIOBlock {
+            virtio_blk: Mutex::new(blk),
+        }),
+        Err(e) => {
+            panic!("Failed to create virtio blk: {}", e);
         }
-    }
+    });
 }
 
 pub struct VirtIOBlock {
@@ -78,8 +60,6 @@ impl BlockDevice for VirtIOBlock {
 }
 
 pub struct VirtioHal;
-
-static mut ADDR_OFF_SET: usize = 0;
 #[allow(unused)]
 unsafe impl Hal for VirtioHal {
     fn dma_alloc(
@@ -93,22 +73,22 @@ unsafe impl Hal for VirtioHal {
             .unwrap();
         let vaddr = VirtAddr::from(ptr.as_ptr() as usize);
         let vpn = VirtPageNum::from(vaddr);
-        let pte = KERNEL_SPACE.lock().get_page_table().translate(vpn).unwrap();
-        unsafe {
-            ADDR_OFF_SET = (ptr.as_ptr() as usize) - (pte.ppn().0 << 12);
-        }
+        let ppn = KERNEL_SPACE
+            .lock()
+            .get_page_table()
+            .translate(vpn)
+            .unwrap()
+            .ppn();
 
         unsafe {
             core::slice::from_raw_parts_mut(ptr.as_ptr(), size).fill(0);
         }
-        info!(
-            "::{} dma_alloc: {:x} {:x} {:x}",
-            line!(),
-            pte.ppn().0 << 12,
+        trace!(
+            "dma_alloc: {:x} {:x}",
+            ppn.0 << 12,
             ptr.as_ptr() as usize,
-            unsafe { ADDR_OFF_SET }
         );
-        (pte.ppn().0 << 12, ptr)
+        (ppn.0 << 12, ptr)
     }
 
     unsafe fn dma_dealloc(
@@ -116,7 +96,7 @@ unsafe impl Hal for VirtioHal {
         vaddr: NonNull<u8>,
         pages: usize,
     ) -> i32 {
-        info!("::{} {:#x} {:#x}", line!(), paddr, vaddr.as_ptr() as usize);
+        trace!("{:#x} {:#x}", paddr, vaddr.as_ptr() as usize);
         heap_allocator::KERNEL_HEAP_ALLOCATOR.lock().dealloc(
             vaddr,
             Layout::from_size_align(pages * PAGE_SIZE, PAGE_SIZE).unwrap(),
@@ -125,33 +105,26 @@ unsafe impl Hal for VirtioHal {
     }
 
     unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> NonNull<u8> {
-        if paddr < unsafe { entry_end_addr } {
-            info!("::{} mmio_phys_to_virt: {:#x}", line!(), paddr);
-            NonNull::new(paddr as *mut u8).unwrap()
-        } else {
-            let vaddr = NonNull::new((paddr + unsafe { ADDR_OFF_SET }) as *mut u8).unwrap();
-            info!(
-                "::{} mmio_phys_to_virt {:#x}",
-                line!(),
-                vaddr.as_ptr() as usize
-            );
-            vaddr
-        }
+        trace!("mmio_phys_to_virt: {:#x}", paddr);
+        NonNull::new(paddr as *mut u8).unwrap()
     }
 
+    // mem is crated by driver in stack, transfrom the virt adrees to phys adress
     unsafe fn share(
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) -> virtio_drivers::PhysAddr {
-        let vaddr = buffer.as_ptr() as *mut u8 as usize;
-        if vaddr < KERNEL_SPACE_OFFSET {
-            info!("::{} {:#x}", line!(), vaddr);
-            vaddr
-        } else {
-            let paddr = vaddr - unsafe { ADDR_OFF_SET };
-            info!("::{} {:#x} {:#x}", line!(), vaddr, paddr);
-            paddr
-        }
+        let vaddr_value = buffer.as_ptr() as *mut u8 as usize;
+        let vaddr = VirtAddr::from(vaddr_value);
+        let ppn = KERNEL_SPACE
+            .lock()
+            .get_page_table()
+            .translate(VirtPageNum::from(vaddr))
+            .unwrap()
+            .ppn();
+        let paddr = (ppn.0 << 12) | (vaddr_value & ((1 << 12) - 1));
+        trace!("share: {:#x} {:#x}", vaddr_value, paddr);
+        paddr
     }
 
     unsafe fn unshare(
@@ -159,6 +132,6 @@ unsafe impl Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) {
-        info!("::{}", line!());
+        
     }
 }

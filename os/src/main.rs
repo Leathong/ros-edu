@@ -29,8 +29,10 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::init();
-    
+    // let _ = logger::init();
     let fdt = mm::init(dtb_addr);
+
+    //FIXME: if not init again, the subsequent log will be lost, I don't know why yet.
     let _ = logger::init();
     walk_dt(fdt);
 
@@ -38,10 +40,8 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
 
-    drivers::virtio_blk_test();
-
-    // fs::list_apps();
-    // task::add_initproc();
+    fs::list_apps();
+    task::add_initproc();
 
     yield_now();
     println!("hello world!");

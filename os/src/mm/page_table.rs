@@ -69,12 +69,11 @@ pub struct PageTable {
 }
 
 unsafe extern "C" {
-    fn _ptenv_switch();
+    // Return the passed in parameter, to ensur its value is preserved in the register.
+    fn _ptenv_switch(passthrough: usize) -> usize;
     fn _ptenv_restore();
 }
 
-const TEMP_PAGE_ADDR: usize = (0o777_777_775 << 12) | !(1 << 39 - 1);
-const ROOT_PAGE_ADDR: usize = (0o777_777_776 << 12) | !(1 << 39 - 1);
 /// Assume that it won't oom when creating/mapping.
 impl PageTable {
     pub fn new_kernel() -> Self {
@@ -87,45 +86,44 @@ impl PageTable {
     }
 
     pub fn spawn(&self, asid: usize) -> Self {
+        let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
+        let pt = Self::spawn_internal(PhysPageNum::from(root_ppn), asid);
+        unsafe {
+            _ptenv_restore();
+        }
+        pt
+    }
+
+    fn spawn_internal(root_ppn: PhysPageNum, asid: usize) -> Self {
         let pt = PageTable {
             root_ppn: frame_alloc().unwrap(),
             asid: asid,
         };
 
         // copy kernel space to the new page table
-        let root_entries = self.root_pte_array();
-        self.map_temp_page(pt.root_ppn);
-        let entries =
-            unsafe { core::slice::from_raw_parts_mut(ROOT_PAGE_ADDR as *mut PageTableEntry, 512) };
+        let root_entries = root_ppn.get_pte_array();
+        let entries = pt.root_ppn.get_pte_array();
         entries.fill(PageTableEntry::empty());
         entries[256..512].copy_from_slice(&root_entries[256..512]);
         pt
-    }
-
-    fn root_pte_array(&self) -> &mut [PageTableEntry] {
-        unsafe { core::slice::from_raw_parts_mut(ROOT_PAGE_ADDR as *mut PageTableEntry, 512) }
-    }
-
-    fn map_temp_page(&self, ppn: PhysPageNum) {
-        let root_entries = self.root_pte_array();
-        root_entries[509] = PageTableEntry::new(ppn, PTEFlags::V | PTEFlags::R | PTEFlags::W);
-        unsafe {
-            asm!(
-                "li t0, {addr}", 
-                "sfence.vma t0, x0", 
-                addr = const TEMP_PAGE_ADDR);
-        }
     }
 
     fn find_pte(root_ppn: PhysPageNum, vpn: VirtPageNum) -> Option<&'static mut PageTableEntry> {
         Self::find_or_crate_pte(root_ppn, vpn, false)
     }
 
-    fn find_pte_create(root_ppn: PhysPageNum, vpn: VirtPageNum) -> Option<&'static mut PageTableEntry> {
+    fn find_pte_create(
+        root_ppn: PhysPageNum,
+        vpn: VirtPageNum,
+    ) -> Option<&'static mut PageTableEntry> {
         Self::find_or_crate_pte(root_ppn, vpn, true)
     }
 
-    fn find_or_crate_pte(root_ppn: PhysPageNum, vpn: VirtPageNum, create: bool) -> Option<&'static mut PageTableEntry> {
+    fn find_or_crate_pte(
+        root_ppn: PhysPageNum,
+        vpn: VirtPageNum,
+        create: bool,
+    ) -> Option<&'static mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -153,12 +151,7 @@ impl PageTable {
     }
 
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let mut root_ppn = self.root_ppn.0;
-        unsafe {
-            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
-            _ptenv_switch();
-        }
-        // println!("lalalalal");
+        let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
         Self::map_internal(PhysPageNum::from(root_ppn), vpn, ppn, flags);
         unsafe {
             _ptenv_restore();
@@ -173,11 +166,7 @@ impl PageTable {
     }
 
     pub fn unmap(&mut self, vpn: VirtPageNum) {
-        let mut root_ppn = self.root_ppn.0;
-        unsafe {
-            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
-            _ptenv_switch();
-        }
+        let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
         Self::unmap_internal(PhysPageNum::from(root_ppn), vpn);
         unsafe {
             _ptenv_restore();
@@ -191,11 +180,7 @@ impl PageTable {
     }
 
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
-        let mut root_ppn = self.root_ppn.0;
-        unsafe {
-            asm!("mv t0, {root_ppn}", "mv {root_ppn}, t0", root_ppn = inout(reg) root_ppn);
-            _ptenv_switch();
-        }
+        let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
         let res = Self::find_pte(PhysPageNum::from(root_ppn), vpn).map(|pte| *pte);
         unsafe {
             _ptenv_restore();

@@ -19,7 +19,6 @@ _start:
     # jump to main
     jalr ra, 0(t0) 
 
-    .globl _init_page_table
 _init_page_table:
     # load page table
     la t0, identical_map_pt
@@ -49,21 +48,9 @@ identical_map_pt:
 
     .section .bss.stack
     .globl boot_stack_lower_bound
-mapping_page_stack:
-    .space 4096 * 4
-    .global mapping_page_stack_top   
-mapping_page_stack_top:
-     
 boot_stack_lower_bound:
     .space 4096 * 16
     .globl boot_stack_top
 boot_stack_top:
 
-    .section .data.addr
-    .global entry_start_addr
-entry_start_addr:
-    .dword sentry
-    .global entry_end_addr
-entry_end_addr:
-    .dword eentry
 

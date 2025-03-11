@@ -1,14 +1,15 @@
+use crate::{config::KERNEL_HEAP_SIZE, println};
 use buddy_system_allocator::LockedHeap;
-use crate::println;
 
 #[global_allocator]
 pub static KERNEL_HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
-pub fn init_kernel_heap(start:usize, size: usize) {
+pub fn init_kernel_heap() {
     unsafe {
         KERNEL_HEAP_ALLOCATOR
             .lock()
-            .init(start, size);
+            .init(&raw mut HEAP_SPACE as usize, KERNEL_HEAP_SIZE);
     }
 }
 

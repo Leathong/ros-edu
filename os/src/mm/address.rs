@@ -110,7 +110,6 @@ impl VirtAddr {
 }
 impl From<VirtAddr> for VirtPageNum {
     fn from(v: VirtAddr) -> Self {
-        assert_eq!(v.page_offset(), 0);
         v.floor()
     }
 }
@@ -158,31 +157,6 @@ impl VirtPageNum {
             vpn >>= 9;
         }
         idx
-    }
-
-    pub fn get_pte_array(&self, level: usize) -> &'static mut [PageTableEntry] {
-        let mut vp: usize = (*self).into();
-        let vp = match level {
-            0 => {
-                vp = !0o777_777_777 | 0o777_777_776;
-                vp
-            }
-            1 => {
-                let idx = (vp >> 18) & 0o000_000_777;
-                vp = !0o777_777_777 | 0o777_777_000 | idx;
-                vp
-            }
-            2 => {
-                let idx = (vp >> 9) & 0o000_777_777;
-                vp = !0o777_777_777 | 0o777_000_000 | idx;
-                vp
-            }
-            _ => panic!("get_pte_array: level {level} not supported"),
-        };
-
-        let addr = (vp << PAGE_SIZE_BITS) as *mut PageTableEntry;
-        // println!("\t pte addr {:#o}", addr as usize);
-        unsafe { core::slice::from_raw_parts_mut(addr, 512) }
     }
 }
 

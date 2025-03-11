@@ -20,9 +20,10 @@ impl Log for SimpleLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             println!(
-                "[{}] {} {}",
+                "[{}] {}::{} {}",
                 record.level(),
-                record.target(),
+                record.file().unwrap_or(""),
+                record.line().unwrap_or(0),
                 record.args()
             );
         }
@@ -37,5 +38,5 @@ lazy_static! {
 
 pub fn init() -> Result<(), SetLoggerError> {
     println!("init logger {:x}", &raw const OSLOGGER as usize);
-    log::set_logger(&(*OSLOGGER)).map(|()| log::set_max_level(LevelFilter::Trace))
+    log::set_logger(&(*OSLOGGER)).map(|()| log::set_max_level(LevelFilter::Info))
 }

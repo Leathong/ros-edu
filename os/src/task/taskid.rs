@@ -22,7 +22,7 @@ impl PidAllocator {
     ///Create an empty `PidAllocator`
     pub fn new() -> Self {
         PidAllocator {
-            current: 0,
+            current: 2,
             recycled: Vec::new(),
         }
     }

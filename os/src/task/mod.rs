@@ -80,14 +80,15 @@ impl Task {
 
         let pid_handle = pid_alloc();
         let mut pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
-        pt.active();
-        // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data, pt);
-        
-        let kernel_stack = KernelStack::new();
+
+        let mut kernel_stack = KernelStack::new();
         let kernel_stack_top = kernel_stack.area.vpn_range.get_end().0 << 12;
         let mut user_ctx = UserContext::default();
         let mut task_ctx = TaskContext::default();
+        kernel_stack.area.map(&mut pt);
+
+        // memory_set with elf program headers/trampoline/trap context/user stack
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data, pt);
 
         task_ctx.set_instruction_pointer(task_kernel_entry as usize);
         task_ctx.set_stack_pointer(kernel_stack_top);
