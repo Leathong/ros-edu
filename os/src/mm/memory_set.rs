@@ -9,6 +9,7 @@ use super::linker_args::*;
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::MMIO;
 use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
+use crate::console::print;
 use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
@@ -48,10 +49,16 @@ impl MemorySet {
     }
 
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        map_area.map(&mut self.page_table);
         if let Some(data) = data {
-            map_area.copy_data(data);
+            let mut write_area = MapArea {
+                vpn_range: map_area.vpn_range,
+                map_type: map_area.map_type,
+                map_perm: ((map_area.map_perm | MapPermission::W) & (!MapPermission::X) & (!MapPermission::U)),
+            };
+            write_area.map(&mut self.page_table);
+            write_area.copy_data(data);
         }
+        map_area.map(&mut self.page_table);
         self.areas.push(map_area);
     }
     /// Without kernel stacks.
@@ -173,10 +180,10 @@ impl MemorySet {
                 if ph_flags.is_execute() {
                     map_perm |= MapPermission::X;
                 }
+
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
                 max_end_vpn = map_area.vpn_range.get_end();
 
-                info!("{:?}", ph);
                 memory_set.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
@@ -207,7 +214,7 @@ impl MemorySet {
     }
 
     pub fn activate(&mut self) {
-        self.page_table.active();
+        self.page_table.activate();
     }
 }
 
@@ -273,7 +280,6 @@ impl MapArea {
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, data: &[u8]) {
-        println!("[Info]: {}::{} copy data", file!(), line!());
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();
@@ -303,7 +309,7 @@ pub enum MapType {
 
 bitflags! {
     /// map permission corresponding to that in pte: `R W X U`
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     pub struct MapPermission: u8 {
         const R = 1 << 1;
         const W = 1 << 2;

@@ -32,7 +32,7 @@ pub fn virtio_probe(node: FdtNode) {
         let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
         unsafe {
             match MmioTransport::new(header, size) {
-                Err(e) => {
+                Err(_) => {
                     // info!("Error creating VirtIO MMIO transport: {}", e);
                     return;
                 }

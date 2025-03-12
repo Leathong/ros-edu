@@ -68,6 +68,7 @@ impl DerefMut for UserContext {
     }
 }
 
+#[allow(unused)]
 impl UserContext {
     /// Get number of syscall
     pub fn get_syscall_num(&self) -> usize {

@@ -2,18 +2,18 @@
 
 //! The architecture support of context switch.
 
-mod context;
-pub(crate) mod processor;
+pub(crate) mod context;
 pub(crate) mod schedule;
 mod stack;
 mod taskid;
 mod utils;
 
-use core::cell::{Ref, RefCell, RefMut};
+use core::cell::{Ref, RefCell, RefMut, UnsafeCell};
 
 use context::TaskContext;
 use lazy_static::lazy_static;
-use processor::PROCESSOR;
+use log::info;
+use crate::cpu::processor::PROCESSOR;
 use riscv::interrupt::{Trap, supervisor::{Exception, Interrupt}};
 use schedule::add_task;
 use utils::ForceSync;
@@ -44,18 +44,24 @@ pub struct Task {
     pub pid: ProcessId,
     pub kstack: KernelStack,
 
-    inner: ForceSync<RefCell<TaskInner>>,
+    inner: ForceSync<UnsafeCell<TaskInner>>,
 }
 
 impl Task {
 
     pub fn new(elf_data: &[u8]) -> Self {
         extern "C" fn task_kernel_entry() {
-            let current_task = PROCESSOR.lock().current().unwrap();
-            let mut inner = current_task.get_mutable_inner();
+            info!("task_kernel_entry");
+            let current_task = Task::current_task().unwrap();
+            info!("");
+            let inner = current_task.get_mutable_inner();
+            info!("");
             loop {
+                info!("run task {}", current_task.pid.value);
                 inner.user_ctx.run();
-                match riscv::register::scause::read().cause().try_into::<Interrupt, Exception>().unwrap() {
+                let cause = riscv::register::scause::read().cause();
+                info!("trap from task {} cause: {:?}", current_task.pid.value, cause);
+                match cause.try_into().unwrap() {
                     Trap::Interrupt(Interrupt::SupervisorTimer) => {
                         set_next_trigger();
                         schedule::yield_now();
@@ -65,6 +71,7 @@ impl Task {
                         syscall::handle_syscall(inner.user_ctx.get_syscall_num(), inner.user_ctx.get_syscall_args());
                     }
                     _ => {
+                        PROCESSOR.as_mut().exit_current(i32::MIN);
                         println!("Unsupported trap {:?}", riscv::register::scause::read().cause());
                         break;
                     }
@@ -95,11 +102,13 @@ impl Task {
 
         user_ctx.set_ip(entry_point);
         user_ctx.set_sp(user_sp);
+
+        info!("create task pid {} entry: {:#x}", pid_handle.value, entry_point);
         
         let task = Self {
             pid: pid_handle,
             kstack: kernel_stack,
-            inner: ForceSync::new(RefCell::new(TaskInner{
+            inner: ForceSync::new(UnsafeCell::new(TaskInner{
                 memory_set,
                 task_ctx: task_ctx,
                 user_ctx: user_ctx,
@@ -114,15 +123,19 @@ impl Task {
     }
 
     pub fn current_task() -> Option<Arc<Task>> {
-        PROCESSOR.lock().current()
+        PROCESSOR.as_mut().current()
     }
 
-    pub fn get_mutable_inner(&self) -> RefMut<TaskInner> {
-        self.inner.borrow_mut()
+    fn as_mut_ptr(&self) -> *mut TaskInner {
+        self.inner.get() as *mut TaskInner
     }
 
-    pub fn get_inner(&self) -> Ref<TaskInner> {
-        self.inner.borrow()
+    pub fn get_mutable_inner(&self) -> &mut TaskInner {
+        unsafe {self.as_mut_ptr().as_mut().unwrap()}
+    }
+
+    pub fn get_inner(&self) -> &TaskInner {
+        unsafe {self.as_mut_ptr().as_ref().unwrap()}
     }
 }
 
@@ -154,7 +167,7 @@ impl TaskInner {
 }
 
 unsafe extern "C" {
-    pub(crate) fn context_switch(cur: *mut TaskContext, nxt: *const TaskContext);
+    pub(crate) fn context_switch(cur: *const TaskContext, nxt: *const TaskContext);
 }
 
 lazy_static! {

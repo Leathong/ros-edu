@@ -59,6 +59,7 @@ impl CalleeRegs {
     }
 }
 
+#[allow(unused)]
 impl TaskContext {
     pub const fn default() -> Self {
         TaskContext {

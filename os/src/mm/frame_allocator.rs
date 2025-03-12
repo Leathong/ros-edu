@@ -47,6 +47,7 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
 
 // === impl ===
 
+#[allow(unused)]
 trait FrameAllocator {
     fn new() -> Self;
     fn alloc(&mut self) -> Option<PhysPageNum>;

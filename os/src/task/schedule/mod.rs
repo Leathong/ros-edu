@@ -2,9 +2,10 @@ use core::arch::asm;
 
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use lazy_static::lazy_static;
+use log::info;
 use spin::Mutex;
 
-use crate::task::{Task, processor};
+use crate::{cpu::processor, task::Task};
 
 enum ReschedAction {
     /// Keep running current task and do nothing.
@@ -31,7 +32,7 @@ impl TaskManager {
 }
 
 lazy_static! {
-    pub static ref TASK_MANAGER: Mutex<TaskManager> =  Mutex::new(TaskManager::new()) ;
+    pub static ref TASK_MANAGER: Mutex<TaskManager> = Mutex::new(TaskManager::new());
 }
 
 pub fn add_task(task: Arc<Task>) {
@@ -52,6 +53,7 @@ pub fn exit_current() {
 }
 
 pub fn yield_now() {
+    info!("yield");
     reschedule(|rq| {
         if let Some(current_task) = Task::current_task() {
             rq.pop_front();
@@ -73,9 +75,11 @@ where
         let action = get_action(&mut TASK_MANAGER.lock().ready_queue);
         match action {
             ReschedAction::DoNothing => {
+                info!("do nothing");
                 return;
             }
             ReschedAction::Retry => {
+                info!("retry");
                 unsafe {
                     asm!("wfi");
                 }

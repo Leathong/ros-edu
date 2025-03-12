@@ -8,6 +8,7 @@ use user_lib::{spawn, wait, yield_};
 
 #[no_mangle]
 fn main() -> i32 {
+    println!("[initproc] initproc start");
     let _ = spawn("user_shell\0");
 
     loop {

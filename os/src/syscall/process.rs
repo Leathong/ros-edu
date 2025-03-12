@@ -1,18 +1,15 @@
 use core::ffi::CStr;
 
-use crate::fs::{open_file, OpenFlags};
+use crate::cpu::processor::PROCESSOR;
+use crate::fs::{OpenFlags, open_file};
 use crate::task::schedule::add_task;
-use crate::task::{
-    self, schedule, Task
-};
+use crate::task::{Task, schedule};
 use crate::timer::get_time_ms;
 use alloc::sync::Arc;
 
-pub fn sys_exit(exit_code: i32) -> ! {
-    let current = Task::current_task().unwrap();
-    current.get_mutable_inner().exit_code = exit_code;
-    current.get_mutable_inner().status = task::TaskStatus::Zombie;
-    panic!("Unreachable in sys_exit!");
+pub fn sys_exit(exit_code: i32) -> isize {
+    PROCESSOR.as_mut().exit_current(exit_code);
+    0
 }
 
 pub fn sys_yield() -> isize {
@@ -54,7 +51,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     let task = Task::current_task().unwrap();
     // find a child process
 
-    let mut inner = task.get_mutable_inner();
+    let inner = task.get_mutable_inner();
     if !inner
         .children
         .iter()
@@ -62,9 +59,11 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     {
         return -1;
     }
-    let pair = inner.children.iter().enumerate().find(|(_, p)| {
-        p.get_inner().is_zombie() && (pid == -1 || pid as usize == p.pid.value)
-    });
+    let pair = inner
+        .children
+        .iter()
+        .enumerate()
+        .find(|(_, p)| p.get_inner().is_zombie() && (pid == -1 || pid as usize == p.pid.value));
     if let Some((idx, _)) = pair {
         let child = inner.children.remove(idx);
         // confirm that child will be deallocated after being removed from children list
