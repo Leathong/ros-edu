@@ -1,33 +1,39 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
-
-use core::ptr;
-
 use super::address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::address::{StepByOne, VPNRange};
 use super::frame_allocator::frame_alloc;
 use super::linker_args::*;
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::MMIO;
-use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, USER_STACK_SIZE};
-use crate::console::print;
+use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE};
 use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
 use log::info;
-use spin::{Mutex, Once};
+use spin::Mutex;
 
-static KERNEL_SPACE_INNER: Once<Mutex<MemorySet>> = Once::new();
+struct KernelSpaceInitParam {
+    pub dtb_addr: usize,
+    pub mem_end: usize,
+}
+static mut INIT_PARAM: KernelSpaceInitParam = KernelSpaceInitParam {
+    dtb_addr: 0,
+    mem_end: 0,
+};
 
 lazy_static! {
     /// a memory set instance through lazy_static! managing kernel space
     pub static ref KERNEL_SPACE: Mutex<MemorySet> = unsafe {
-        ptr::read(KERNEL_SPACE_INNER.get().unwrap())
+        Mutex::new(MemorySet::new_kernel(INIT_PARAM.dtb_addr, INIT_PARAM.mem_end))
     };
 }
 
 pub fn init_kernel_space(dtb_addr: usize, mem_end: usize) {
-    KERNEL_SPACE_INNER.call_once(|| Mutex::new(MemorySet::new_kernel(dtb_addr, mem_end)));
+    unsafe {
+        INIT_PARAM.dtb_addr = dtb_addr;
+        INIT_PARAM.mem_end = mem_end;
+    }
 }
 
 /// memory set structure, controls virtual-memory space
@@ -48,17 +54,22 @@ impl MemorySet {
         &self.page_table
     }
 
-    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+    pub fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         if let Some(data) = data {
             let mut write_area = MapArea {
                 vpn_range: map_area.vpn_range,
                 map_type: map_area.map_type,
-                map_perm: ((map_area.map_perm | MapPermission::W) & (!MapPermission::X) & (!MapPermission::U)),
+                map_perm: ((map_area.map_perm | MapPermission::W)
+                    & (!MapPermission::X)
+                    & (!MapPermission::U)),
             };
             write_area.map(&mut self.page_table);
             write_area.copy_data(data);
+            map_area.update_perm(&mut self.page_table);
+        } else {
+            map_area.map(&mut self.page_table);
         }
-        map_area.map(&mut self.page_table);
+
         self.areas.push(map_area);
     }
     /// Without kernel stacks.
@@ -152,7 +163,7 @@ impl MemorySet {
 
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
-    pub fn from_elf(elf_data: &[u8], new_pt: PageTable) -> (Self, usize, usize) {
+    pub fn from_elf(elf_data: &[u8], new_pt: PageTable) -> (Self, usize) {
         let mut memory_set = Self::new(new_pt);
         memory_set.map_hard_ware();
         // map program headers of elf, with U flag
@@ -161,7 +172,6 @@ impl MemorySet {
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
-        let mut max_end_vpn = VirtPageNum(0);
         memory_set.activate();
         info!("token {:#x}", memory_set.page_table.token());
         for i in 0..ph_count {
@@ -182,7 +192,6 @@ impl MemorySet {
                 }
 
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
-                max_end_vpn = map_area.vpn_range.get_end();
 
                 memory_set.push(
                     map_area,
@@ -190,27 +199,8 @@ impl MemorySet {
                 );
             }
         }
-        // map user stack with U flags
-        let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_stack_bottom: usize = max_end_va.into();
-        // guard page
-        user_stack_bottom += PAGE_SIZE;
-        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        memory_set.push(
-            MapArea::new(
-                user_stack_bottom.into(),
-                user_stack_top.into(),
-                MapType::Framed,
-                MapPermission::R | MapPermission::W | MapPermission::U,
-            ),
-            None,
-        );
 
-        (
-            memory_set,
-            user_stack_top,
-            elf.header.pt2.entry_point() as usize,
-        )
+        (memory_set, elf.header.pt2.entry_point() as usize)
     }
 
     pub fn activate(&mut self) {
@@ -269,6 +259,12 @@ impl MapArea {
     pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);
+        }
+    }
+    pub fn update_perm(&mut self, page_table: &mut PageTable) {
+        for vpn in self.vpn_range {
+            let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
+            page_table.update_perm(vpn, pte_flags);
         }
     }
     #[allow(unused)]

@@ -4,8 +4,7 @@ use core::arch::global_asm;
 
 use context::TrapFrame;
 use riscv::register::{
-    satp::{self},
-    scause, sepc, sie, stval, stvec,
+    satp::{self}, scause, sepc, sie, sstatus, stval, stvec
 };
 
 use crate::{lang_items::print_backtrace, println, sbi::shutdown};
@@ -39,11 +38,12 @@ fn trap_handler(trapframe: &TrapFrame) -> ! {
     let sepc = sepc::read();
 
     println!(
-        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x} satp: {:#x}",
+        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x} satp: {:#x} sstatus: {:#x}",
         scause.bits(),
         stval,
         sepc,
         satp::read().bits(),
+        sstatus::read().bits()
     );
     unsafe {
         print_backtrace(trapframe.general.s0, sepc);

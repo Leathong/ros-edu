@@ -5,6 +5,7 @@ use crate::mm::{address::VirtPageNum, frame_allocator::frame_alloc};
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use riscv::register::satp;
+use riscv::register::sstatus::set_sum;
 
 global_asm!(include_str!("switch_env.S"));
 
@@ -77,6 +78,7 @@ impl PageTable {
             root_ppn: frame_alloc().unwrap(),
             asid: 1,
         };
+        unsafe {set_sum();}
         kernel_pt.root_ppn.get_bytes_array().fill(0);
         kernel_pt
     }
@@ -146,6 +148,15 @@ impl PageTable {
         result
     }
 
+    pub fn update_perm(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+        let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
+        let pte = Self::find_pte(PhysPageNum::from(root_ppn), vpn).unwrap();
+        *pte = PageTableEntry::new(pte.ppn(), flags | PTEFlags::V);
+        unsafe {
+            _ptenv_restore();
+        }
+    }
+
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         // println!("map {:x} to {:x}", vpn.0, ppn.0);
         let root_ppn = unsafe { _ptenv_switch(self.root_ppn.0) };
@@ -157,7 +168,7 @@ impl PageTable {
 
     fn map_internal(root_ppn: PhysPageNum, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = Self::find_pte_create(root_ppn, vpn).unwrap();
-        // assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
+        assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
         // println!("--- map {:x} to {:x}", vpn.0, ppn.0);
         unsafe {
@@ -200,7 +211,7 @@ impl PageTable {
         unsafe {
             satp::write(satp::Satp::from_bits(satp));
             asm!(
-                "sfence.vma zero",
+                "sfence.vma",
             );
         }
     }

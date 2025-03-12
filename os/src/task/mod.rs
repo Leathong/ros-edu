@@ -8,31 +8,40 @@ mod stack;
 mod taskid;
 mod utils;
 
-use core::cell::{Ref, RefCell, RefMut, UnsafeCell};
+use core::cell::UnsafeCell;
 
+use crate::{
+    cpu::processor::PROCESSOR,
+    fs::{Stdin, Stdout},
+};
 use context::TaskContext;
 use lazy_static::lazy_static;
 use log::info;
-use crate::cpu::processor::PROCESSOR;
-use riscv::interrupt::{Trap, supervisor::{Exception, Interrupt}};
+use riscv::interrupt::{
+    Trap,
+    supervisor::{Exception, Interrupt},
+};
 use schedule::add_task;
 use utils::ForceSync;
 
 core::arch::global_asm!(include_str!("switch.S"));
 
-use crate::{fs::open_file, timer::set_next_trigger};
 use crate::fs::File;
 use crate::fs::OpenFlags;
-use crate::mm::memory_set::MemorySet;
 use crate::mm::memory_set::KERNEL_SPACE;
+use crate::mm::memory_set::MemorySet;
 use crate::println;
 use crate::syscall;
 use crate::task::stack::*;
 use crate::task::taskid::*;
 use crate::trap::context::UserContext;
+use crate::{fs::open_file, timer::set_next_trigger};
 
-use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use alloc::{
+    sync::{Arc, Weak},
+    vec,
+};
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum TaskStatus {
@@ -42,37 +51,42 @@ pub enum TaskStatus {
 
 pub struct Task {
     pub pid: ProcessId,
-    pub kstack: KernelStack,
 
     inner: ForceSync<UnsafeCell<TaskInner>>,
 }
 
 impl Task {
-
-    pub fn new(elf_data: &[u8]) -> Self {
+    pub fn new_with_elf(elf_data: &[u8]) -> Self {
         extern "C" fn task_kernel_entry() {
             info!("task_kernel_entry");
             let current_task = Task::current_task().unwrap();
-            info!("");
             let inner = current_task.get_mutable_inner();
-            info!("");
             loop {
                 info!("run task {}", current_task.pid.value);
                 inner.user_ctx.run();
                 let cause = riscv::register::scause::read().cause();
-                info!("trap from task {} cause: {:?}", current_task.pid.value, cause);
+                info!(
+                    "trap from task {} cause: {:?}",
+                    current_task.pid.value, cause
+                );
                 match cause.try_into().unwrap() {
                     Trap::Interrupt(Interrupt::SupervisorTimer) => {
                         set_next_trigger();
                         schedule::yield_now();
-                    },
+                    }
                     Trap::Exception(Exception::UserEnvCall) => {
                         inner.user_ctx.sepc += 4;
-                        syscall::handle_syscall(inner.user_ctx.get_syscall_num(), inner.user_ctx.get_syscall_args());
+                        syscall::handle_syscall(
+                            inner.user_ctx.get_syscall_num(),
+                            inner.user_ctx.get_syscall_args(),
+                        );
                     }
                     _ => {
                         PROCESSOR.as_mut().exit_current(i32::MIN);
-                        println!("Unsupported trap {:?}", riscv::register::scause::read().cause());
+                        println!(
+                            "Unsupported trap {:?}",
+                            riscv::register::scause::read().cause()
+                        );
                         break;
                     }
                 }
@@ -86,36 +100,50 @@ impl Task {
         }
 
         let pid_handle = pid_alloc();
-        let mut pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
+        let pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
 
-        let mut kernel_stack = KernelStack::new();
+        let kernel_stack = KernelStack::new();
         let kernel_stack_top = kernel_stack.area.vpn_range.get_end().0 << 12;
         let mut user_ctx = UserContext::default();
         let mut task_ctx = TaskContext::default();
-        kernel_stack.area.map(&mut pt);
 
-        // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data, pt);
+        let user_stack = UserStack::new();
+        let user_stack_top = user_stack.area.vpn_range.get_end().0 << 12;
+
+        // memory_set with elf
+        let (mut memory_set, entry_point) = MemorySet::from_elf(elf_data, pt);
+
+        memory_set.push(kernel_stack.area, None);
+        memory_set.push(user_stack.area, None);
 
         task_ctx.set_instruction_pointer(task_kernel_entry as usize);
         task_ctx.set_stack_pointer(kernel_stack_top);
 
         user_ctx.set_ip(entry_point);
-        user_ctx.set_sp(user_sp);
+        user_ctx.set_sp(user_stack_top);
 
-        info!("create task pid {} entry: {:#x}", pid_handle.value, entry_point);
-        
+        info!(
+            "create task pid {} entry: {:#x}",
+            pid_handle.value, entry_point
+        );
+
         let task = Self {
             pid: pid_handle,
-            kstack: kernel_stack,
-            inner: ForceSync::new(UnsafeCell::new(TaskInner{
+            inner: ForceSync::new(UnsafeCell::new(TaskInner {
                 memory_set,
                 task_ctx: task_ctx,
                 user_ctx: user_ctx,
                 parent: None,
                 children: [].to_vec(),
                 exit_code: 0,
-                fd_table: [].to_vec(),
+                fd_table: vec![
+                    // 0 -> stdin
+                    Some(Arc::new(Stdin)),
+                    // 1 -> stdout
+                    Some(Arc::new(Stdout)),
+                    // 2 -> stdout as stderr
+                    Some(Arc::new(Stdout)),
+                ],
                 status: TaskStatus::Ready,
             })),
         };
@@ -131,11 +159,11 @@ impl Task {
     }
 
     pub fn get_mutable_inner(&self) -> &mut TaskInner {
-        unsafe {self.as_mut_ptr().as_mut().unwrap()}
+        unsafe { self.as_mut_ptr().as_mut().unwrap() }
     }
 
     pub fn get_inner(&self) -> &TaskInner {
-        unsafe {self.as_mut_ptr().as_ref().unwrap()}
+        unsafe { self.as_mut_ptr().as_ref().unwrap() }
     }
 }
 
@@ -175,7 +203,7 @@ lazy_static! {
     pub static ref INITPROC: Arc<Task> = Arc::new({
         let inode = open_file("initproc", OpenFlags::RDONLY).unwrap();
         let v = inode.read_all();
-        Task::new(v.as_slice())
+        Task::new_with_elf(v.as_slice())
     });
 }
 

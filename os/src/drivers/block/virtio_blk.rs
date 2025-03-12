@@ -18,7 +18,7 @@ use virtio_drivers::{
     transport::{Transport, mmio::MmioTransport},
 };
 
-use log::trace;
+use log::{info, trace};
 
 pub fn init_blk(transport: MmioTransport) {
     trace!(

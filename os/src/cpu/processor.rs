@@ -1,5 +1,3 @@
-use core::arch::asm;
-
 use crate::{cpu_local, task};
 use alloc::sync::Arc;
 use log::info;
@@ -48,6 +46,7 @@ impl Processor {
         let inner = next_task.get_mutable_inner();
         inner.memory_set.activate();
         let ctx_ptr = &raw const (inner.task_ctx);
+        
         info!("switch to task {:?}", next_task.pid);
         unsafe {
             context_switch(&mut old_ctx, ctx_ptr);
