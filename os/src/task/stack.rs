@@ -8,11 +8,11 @@ pub struct KernelStack {
 }
 
 impl KernelStack {
-    pub fn new() -> Self {
+    pub fn new(pid: usize) -> Self {
         Self {
             area: MapArea::new(
-                (Self::get_kernel_stack_end() + PAGE_SIZE).into(),
-                Self::get_kernel_stack_bottom().into(),
+                (usize::MAX - (KERNEL_STACK_SIZE + PAGE_SIZE) * pid - KERNEL_STACK_SIZE + 1).into(),
+                (usize::MAX - (KERNEL_STACK_SIZE + PAGE_SIZE) * pid).into(),
                 MapType::Framed,
                 MapPermission::R | MapPermission::W,
             ),

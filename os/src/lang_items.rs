@@ -1,4 +1,6 @@
 use core::{arch::asm, panic::PanicInfo};
+use riscv::register::{satp, scause, sstatus, stval};
+
 use crate::{println, sbi::shutdown};
 
 #[allow(unused)]
@@ -28,6 +30,12 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
             location.file(),
             location.line(),
             info.message()
+        );
+        println!(
+            "satp: {:#x} sstatus: {:#x} stval: {:#x}",
+            satp::read().bits(),
+            sstatus::read().bits(),
+            stval::read(),
         );
     } else {
         println!("Panicked: {}", info.message())

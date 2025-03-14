@@ -24,12 +24,12 @@ mod fs;
 mod process;
 
 use fs::*;
-use log::info;
+use log::{info, trace};
 use process::*;
 use riscv::register::sstatus;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
-    info!("handle syscall id: {}", syscall_id);
+    trace!("handle syscall id: {}", syscall_id);
     unsafe {sstatus::set_sum();}
     let res = match syscall_id {
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
@@ -44,6 +44,6 @@ pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     };
-    info!("handle syscall {} done, res {}", syscall_id, res);
+    trace!("handle syscall {} done, res {}", syscall_id, res);
     res
 }

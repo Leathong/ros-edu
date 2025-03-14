@@ -16,10 +16,13 @@ use crate::{
 };
 use context::TaskContext;
 use lazy_static::lazy_static;
-use log::info;
-use riscv::interrupt::{
-    Trap,
-    supervisor::{Exception, Interrupt},
+use log::{info, trace};
+use riscv::{
+    interrupt::{
+        Trap,
+        supervisor::{Exception, Interrupt},
+    },
+    register::sstatus::set_sum,
 };
 use schedule::add_task;
 use utils::ForceSync;
@@ -58,17 +61,20 @@ pub struct Task {
 impl Task {
     pub fn new_with_elf(elf_data: &[u8]) -> Self {
         extern "C" fn task_kernel_entry() {
-            info!("task_kernel_entry");
+            trace!("task_kernel_entry");
             let current_task = Task::current_task().unwrap();
             let inner = current_task.get_mutable_inner();
             loop {
-                info!("run task {}", current_task.pid.value);
+                trace!("run task {}", current_task.pid.value);
                 inner.user_ctx.run();
                 let cause = riscv::register::scause::read().cause();
-                info!(
+                trace!(
                     "trap from task {} cause: {:?}",
                     current_task.pid.value, cause
                 );
+                unsafe {
+                    set_sum();
+                }
                 match cause.try_into().unwrap() {
                     Trap::Interrupt(Interrupt::SupervisorTimer) => {
                         set_next_trigger();
@@ -82,11 +88,11 @@ impl Task {
                         );
                     }
                     _ => {
-                        PROCESSOR.as_mut().exit_current(i32::MIN);
-                        println!(
+                        panic!(
                             "Unsupported trap {:?}",
                             riscv::register::scause::read().cause()
                         );
+                        PROCESSOR.as_mut().exit_current(i32::MIN);
                         break;
                     }
                 }
@@ -102,7 +108,7 @@ impl Task {
         let pid_handle = pid_alloc();
         let pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
 
-        let kernel_stack = KernelStack::new();
+        let kernel_stack = KernelStack::new(pid_handle.value);
         let kernel_stack_top = kernel_stack.area.vpn_range.get_end().0 << 12;
         let mut user_ctx = UserContext::default();
         let mut task_ctx = TaskContext::default();

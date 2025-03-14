@@ -1,6 +1,6 @@
 use crate::{cpu_local, task};
 use alloc::sync::Arc;
-use log::info;
+use log::{info, trace};
 use spin::Once;
 
 use crate::task::{Task, context::TaskContext, context_switch};
@@ -31,7 +31,7 @@ impl Processor {
     }
 
     pub fn exit_current(&self, exit_code: i32) {
-        info!("exit_current: {}", exit_code);
+        trace!("exit_current: {}", exit_code);
         let current = self.current().unwrap();
         current.get_mutable_inner().exit_code = exit_code;
         current.get_mutable_inner().status = task::TaskStatus::Zombie;
@@ -47,7 +47,7 @@ impl Processor {
         inner.memory_set.activate();
         let ctx_ptr = &raw const (inner.task_ctx);
         
-        info!("switch to task {:?}", next_task.pid);
+        trace!("switch to task {:?}", next_task.pid);
         unsafe {
             context_switch(&mut old_ctx, ctx_ptr);
         };

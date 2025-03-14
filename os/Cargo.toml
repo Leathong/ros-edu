@@ -17,5 +17,6 @@ spin = { version = "0.9.8" }
 fdt = { version = "0.1.5" }
 virtio-drivers = { path = "../../thirdParty/virtio-drivers" }
 log = { version = "0.4.8" }
+macros = { path = "../macros" }
 # virtio-drivers = { version = "0.9.0" }
 # virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }

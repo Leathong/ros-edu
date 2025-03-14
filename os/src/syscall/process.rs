@@ -6,7 +6,7 @@ use crate::task::schedule::add_task;
 use crate::task::{Task, schedule};
 use crate::timer::get_time_ms;
 use alloc::sync::Arc;
-use log::info;
+use log::{info, trace};
 
 pub fn sys_exit(exit_code: i32) -> isize {
     PROCESSOR.as_mut().exit_current(exit_code);
@@ -33,7 +33,6 @@ pub fn sys_spawn(path: *const u8) -> isize {
             Err(_) => return -1,
         }
     };
-    info!("sys_spawn: {:?}", path);
     if let Some(app_inode) = open_file(path, OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let current = Task::current_task().unwrap();

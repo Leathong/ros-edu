@@ -6,10 +6,10 @@ use crate::{
     mm::{
         address::{VirtAddr, VirtPageNum},
         heap_allocator,
-        memory_set::KERNEL_SPACE,
-    },
+        memory_set::KERNEL_SPACE, page_table::{PageTable, PageTableEntry},
+    }, task::Task,
 };
-use alloc::sync::Arc;
+use alloc::{sync::Arc, task};
 use easy_fs::BlockDevice;
 use spin::Mutex;
 use virtio_drivers::{
@@ -73,13 +73,13 @@ unsafe impl Hal for VirtioHal {
             .unwrap();
         let vaddr = VirtAddr::from(ptr.as_ptr() as usize);
         let vpn = VirtPageNum::from(vaddr);
-        let ppn = KERNEL_SPACE
-            .lock()
-            .get_page_table()
-            .translate(vpn)
-            .unwrap()
-            .ppn();
-
+        let pte;
+        if let Some(task) = Task::current_task() {
+            pte = task.get_inner().memory_set.get_page_table().translate(VirtPageNum::from(vaddr));
+        } else {
+            pte = KERNEL_SPACE.lock().get_page_table().translate(VirtPageNum::from(vaddr));
+        }
+        let ppn = pte.unwrap().ppn();
         unsafe {
             core::slice::from_raw_parts_mut(ptr.as_ptr(), size).fill(0);
         }
@@ -116,12 +116,14 @@ unsafe impl Hal for VirtioHal {
     ) -> virtio_drivers::PhysAddr {
         let vaddr_value = buffer.as_ptr() as *mut u8 as usize;
         let vaddr = VirtAddr::from(vaddr_value);
-        let ppn = KERNEL_SPACE
-            .lock()
-            .get_page_table()
-            .translate(VirtPageNum::from(vaddr))
-            .unwrap()
-            .ppn();
+
+        let pte;
+        if let Some(task) = Task::current_task() {
+            pte = task.get_inner().memory_set.get_page_table().translate(VirtPageNum::from(vaddr));
+        } else {
+            pte = KERNEL_SPACE.lock().get_page_table().translate(VirtPageNum::from(vaddr));
+        }
+        let ppn = pte.unwrap().ppn();
         let paddr = (ppn.0 << 12) | (vaddr_value & ((1 << 12) - 1));
         trace!("share: {:#x} {:#x}", vaddr_value, paddr);
         paddr

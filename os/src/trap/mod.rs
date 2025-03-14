@@ -38,7 +38,7 @@ fn trap_handler(trapframe: &TrapFrame) -> ! {
     let sepc = sepc::read();
 
     println!(
-        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x} satp: {:#x} sstatus: {:#x}",
+        "[trap] a trap occurs! scause: {:#x}, stval: {:#x} sepc: {:#x} satp: {:#x} sstatus: {:#x}",
         scause.bits(),
         stval,
         sepc,

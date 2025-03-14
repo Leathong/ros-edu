@@ -10,7 +10,7 @@ use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
-use log::info;
+use log::{info, trace};
 use spin::Mutex;
 
 struct KernelSpaceInitParam {
@@ -145,6 +145,8 @@ impl MemorySet {
 
         memory_set.map_hard_ware();
 
+        memory_set.get_page_table().init_ptenv();
+
         memory_set
     }
 
@@ -165,7 +167,6 @@ impl MemorySet {
     /// also returns user_sp and entry point.
     pub fn from_elf(elf_data: &[u8], new_pt: PageTable) -> (Self, usize) {
         let mut memory_set = Self::new(new_pt);
-        memory_set.map_hard_ware();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -173,10 +174,11 @@ impl MemorySet {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         memory_set.activate();
-        info!("token {:#x}", memory_set.page_table.token());
+        trace!("token {:#x}", memory_set.page_table.token());
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                // info!("segment: {:?}", ph);
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
                 let mut map_perm = MapPermission::U;
