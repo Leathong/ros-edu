@@ -41,7 +41,7 @@ pub fn add_task(task: Arc<Task>) {
 
 pub fn exit_current() {
     reschedule(|rq| {
-        let _ = rq.pop_front();
+        rq.pop_front();
         if let Some(next) = rq.front() {
             ReschedAction::SwitchTo(next.clone())
         } else {

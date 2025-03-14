@@ -1,6 +1,6 @@
-use crate::{cpu_local, task};
+use crate::{cpu_local, lang_items::print_backtrace, task};
 use alloc::sync::Arc;
-use log::info;
+use log::{info, trace};
 use spin::Once;
 
 use crate::task::{Task, context::TaskContext, context_switch};
@@ -31,10 +31,26 @@ impl Processor {
     }
 
     pub fn exit_current(&self, exit_code: i32) {
-        info!("exit_current: {}", exit_code);
+        trace!("exit_current: {}", exit_code);
         let current = self.current().unwrap();
         current.get_mutable_inner().exit_code = exit_code;
         current.get_mutable_inner().status = task::TaskStatus::Zombie;
+    }
+
+    pub fn abort_current(&self) {
+        let current = self.current().unwrap();
+        let fp = current.get_inner().user_ctx.general.s0;
+        let ra: usize = current.get_inner().user_ctx.sepc;
+        unsafe {
+            info!(
+                "Aborting task {} fp: {:x} ra: {:x}",
+                current.pid.value,
+                *(fp as *mut usize),
+                ra
+            );
+            print_backtrace(fp, ra);
+        }
+        self.exit_current(i32::MIN);
     }
 
     pub fn switch_to_task(&mut self, next_task: Arc<Task>) {
@@ -46,9 +62,11 @@ impl Processor {
         let inner = next_task.get_mutable_inner();
         inner.memory_set.activate();
         let ctx_ptr = &raw const (inner.task_ctx);
-        
-        info!("switch to task {:?}", next_task.pid);
+
+        info!("switch to task {}", next_task.pid.value);
         unsafe {
+            drop(next_task);
+            // this function does not return, manually drop all the variables on the stack
             context_switch(&mut old_ctx, ctx_ptr);
         };
     }

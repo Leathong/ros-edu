@@ -6,10 +6,15 @@ use crate::task::schedule::add_task;
 use crate::task::{Task, schedule};
 use crate::timer::get_time_ms;
 use alloc::sync::Arc;
-use log::info;
+use log::{info, trace};
 
 pub fn sys_exit(exit_code: i32) -> isize {
     PROCESSOR.as_mut().exit_current(exit_code);
+    0
+}
+
+pub fn sys_abort() -> isize {
+    PROCESSOR.as_mut().abort_current();
     0
 }
 
@@ -33,15 +38,15 @@ pub fn sys_spawn(path: *const u8) -> isize {
             Err(_) => return -1,
         }
     };
-    info!("sys_spawn: {:?}", path);
     if let Some(app_inode) = open_file(path, OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let current = Task::current_task().unwrap();
         let new_task = Arc::new(Task::new_with_elf(all_data.as_slice()));
+        let pid = new_task.pid.value;
         new_task.get_mutable_inner().parent = Some(Arc::downgrade(&current));
         current.get_mutable_inner().children.push(new_task.clone());
-        add_task(new_task.clone());
-        new_task.pid.value as isize
+        add_task(new_task);
+        pid as isize
     } else {
         -1
     }

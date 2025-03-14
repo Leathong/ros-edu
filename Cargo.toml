@@ -1,7 +1,7 @@
 [workspace]
 members = ["os", "easy_fs"]
 resolver = "2"
-exclude = ["virtio-drivers"]
+exclude = ["macros"]
 
 
 [profile.release]

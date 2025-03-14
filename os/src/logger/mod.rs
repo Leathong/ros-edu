@@ -20,7 +20,7 @@ impl Log for SimpleLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             println!(
-                "[{}] {}::{} {}",
+                "[{}] {}:{} {}",
                 record.level(),
                 record.file().unwrap_or(""),
                 record.line().unwrap_or(0),

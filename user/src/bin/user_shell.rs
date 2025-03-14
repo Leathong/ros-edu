@@ -29,6 +29,7 @@ pub fn main() -> i32 {
                 if !line.is_empty() {
                     line.push('\0');
                     let pid = spawn(line.as_str());
+                    println!("Shell: Process {} created", pid);
                     if pid < 0 {
                         return -4;
                     }

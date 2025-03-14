@@ -14,6 +14,7 @@ const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_ABORT: usize = 94;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
@@ -24,12 +25,12 @@ mod fs;
 mod process;
 
 use fs::*;
-use log::info;
+use log::{info, trace};
 use process::*;
 use riscv::register::sstatus;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
-    info!("handle syscall id: {}", syscall_id);
+    trace!("handle syscall id: {}", syscall_id);
     unsafe {sstatus::set_sum();}
     let res = match syscall_id {
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
@@ -37,6 +38,7 @@ pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
+        SYSCALL_ABORT => sys_abort(),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_GET_TIME => sys_get_time(),
         SYSCALL_GETPID => sys_getpid(),
@@ -44,6 +46,6 @@ pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     };
-    info!("handle syscall {} done, res {}", syscall_id, res);
+    trace!("handle syscall {} done, res {}", syscall_id, res);
     res
 }

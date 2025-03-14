@@ -33,17 +33,9 @@ pub fn enable_timer_interrupt() {
 #[unsafe(no_mangle)]
 #[allow(unused)]
 fn trap_handler(trapframe: &TrapFrame) -> ! {
-    let scause = scause::read();
-    let stval = stval::read();
     let sepc = sepc::read();
-
     println!(
-        "[trap] a trap occurs! scause: {}, stval: {:#x} sepc: {:#x} satp: {:#x} sstatus: {:#x}",
-        scause.bits(),
-        stval,
-        sepc,
-        satp::read().bits(),
-        sstatus::read().bits()
+        "[trap] a trap occurs!"
     );
     unsafe {
         print_backtrace(trapframe.general.s0, sepc);

@@ -16,10 +16,13 @@ use crate::{
 };
 use context::TaskContext;
 use lazy_static::lazy_static;
-use log::info;
-use riscv::interrupt::{
-    Trap,
-    supervisor::{Exception, Interrupt},
+use log::{info, trace};
+use riscv::{
+    interrupt::{
+        Trap,
+        supervisor::{Exception, Interrupt},
+    },
+    register::sstatus::set_sum,
 };
 use schedule::add_task;
 use utils::ForceSync;
@@ -30,7 +33,6 @@ use crate::fs::File;
 use crate::fs::OpenFlags;
 use crate::mm::memory_set::KERNEL_SPACE;
 use crate::mm::memory_set::MemorySet;
-use crate::println;
 use crate::syscall;
 use crate::task::stack::*;
 use crate::task::taskid::*;
@@ -58,17 +60,20 @@ pub struct Task {
 impl Task {
     pub fn new_with_elf(elf_data: &[u8]) -> Self {
         extern "C" fn task_kernel_entry() {
-            info!("task_kernel_entry");
+            trace!("task_kernel_entry");
             let current_task = Task::current_task().unwrap();
             let inner = current_task.get_mutable_inner();
             loop {
-                info!("run task {}", current_task.pid.value);
+                trace!("run task {}", current_task.pid.value);
                 inner.user_ctx.run();
                 let cause = riscv::register::scause::read().cause();
-                info!(
+                trace!(
                     "trap from task {} cause: {:?}",
                     current_task.pid.value, cause
                 );
+                unsafe {
+                    set_sum();
+                }
                 match cause.try_into().unwrap() {
                     Trap::Interrupt(Interrupt::SupervisorTimer) => {
                         set_next_trigger();
@@ -76,17 +81,16 @@ impl Task {
                     }
                     Trap::Exception(Exception::UserEnvCall) => {
                         inner.user_ctx.sepc += 4;
-                        syscall::handle_syscall(
+                        inner.user_ctx.general.a0 = syscall::handle_syscall(
                             inner.user_ctx.get_syscall_num(),
                             inner.user_ctx.get_syscall_args(),
-                        );
+                        ) as usize;
                     }
                     _ => {
-                        PROCESSOR.as_mut().exit_current(i32::MIN);
-                        println!(
-                            "Unsupported trap {:?}",
-                            riscv::register::scause::read().cause()
+                        info!(
+                            "Unsupported trap {:?}", cause
                         );
+                        PROCESSOR.as_mut().abort_current();
                         break;
                     }
                 }
@@ -96,13 +100,16 @@ impl Task {
                 }
             }
 
+            drop(current_task);
+            // this function does not return, manually drop all the variables on the stack
             schedule::exit_current();
         }
 
+        let kernel_space = KERNEL_SPACE.lock();
         let pid_handle = pid_alloc();
-        let pt = KERNEL_SPACE.lock().get_page_table().spawn(pid_handle.value);
+        let pt = kernel_space.get_page_table().spawn(pid_handle.value);
 
-        let kernel_stack = KernelStack::new();
+        let kernel_stack = KernelStack::new(pid_handle.value);
         let kernel_stack_top = kernel_stack.area.vpn_range.get_end().0 << 12;
         let mut user_ctx = UserContext::default();
         let mut task_ctx = TaskContext::default();
@@ -110,8 +117,16 @@ impl Task {
         let user_stack = UserStack::new();
         let user_stack_top = user_stack.area.vpn_range.get_end().0 << 12;
 
+        let current_task = Task::current_task();
+        let mut cur_pt = kernel_space.get_page_table();
+
+        let task: Arc<Task>;
+        if let Some(cur) = current_task {
+            task = cur.clone();
+            cur_pt = task.get_mutable_inner().memory_set.get_page_table();
+        }
         // memory_set with elf
-        let (mut memory_set, entry_point) = MemorySet::from_elf(elf_data, pt);
+        let (mut memory_set, entry_point) = MemorySet::from_elf(elf_data, pt, cur_pt);
 
         memory_set.push(kernel_stack.area, None);
         memory_set.push(user_stack.area, None);

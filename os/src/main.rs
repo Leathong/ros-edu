@@ -30,7 +30,7 @@ global_asm!(include_str!("entry.asm"));
 #[unsafe(no_mangle)]
 pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     trap::init();
-    // let _ = logger::init();
+    let _ = logger::init();
     let fdt = mm::init(dtb_addr);
 
     //FIXME: if not init again, the subsequent log will be lost, I don't know why yet.
@@ -38,8 +38,8 @@ pub fn ros_main(_hartid: usize, dtb_addr: usize) -> ! {
     walk_dt(fdt);
 
     trap::init();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
+    // trap::enable_timer_interrupt();
+    // timer::set_next_trigger();
 
     fs::list_apps();
     task::add_initproc();
