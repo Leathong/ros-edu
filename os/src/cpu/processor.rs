@@ -30,6 +30,11 @@ impl Processor {
         self.current.as_ref().map(Arc::clone)
     }
 
+    pub fn yield_current(&self) {
+        let current = self.current().unwrap();
+        current.get_mutable_inner().status = task::TaskStatus::Ready;
+    }
+
     pub fn exit_current(&self, exit_code: i32) {
         trace!("exit_current: {}", exit_code);
         let current = self.current().unwrap();

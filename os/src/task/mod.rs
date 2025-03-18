@@ -48,6 +48,7 @@ use alloc::{
 #[derive(Copy, Clone, PartialEq)]
 pub enum TaskStatus {
     Ready,
+    Running,
     Zombie,
 }
 
@@ -61,10 +62,11 @@ impl Task {
     pub fn new_with_elf(elf_data: &[u8]) -> Self {
         extern "C" fn task_kernel_entry() {
             trace!("task_kernel_entry");
-            let current_task = Task::current_task().unwrap();
-            let inner = current_task.get_mutable_inner();
             loop {
+                let current_task = Task::current_task().unwrap();
+                let inner = current_task.get_mutable_inner();
                 trace!("run task {}", current_task.pid.value);
+                inner.status = TaskStatus::Running;
                 inner.user_ctx.run();
                 let cause = riscv::register::scause::read().cause();
                 trace!(
@@ -93,12 +95,16 @@ impl Task {
                     }
                 }
 
-                if current_task.get_inner().status == TaskStatus::Zombie {
+                if current_task.get_inner().status == TaskStatus::Ready {
+                    drop(current_task);
+                    // this function does not return, manually drop all the variables on the stack
+                    schedule::yield_now();
+                } else if current_task.get_inner().status == TaskStatus::Zombie {
+                    drop(current_task);
                     break;
                 }
             }
 
-            drop(current_task);
             // this function does not return, manually drop all the variables on the stack
             schedule::exit_current();
         }

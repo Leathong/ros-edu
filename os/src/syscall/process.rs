@@ -2,11 +2,10 @@ use core::ffi::CStr;
 
 use crate::cpu::processor::PROCESSOR;
 use crate::fs::{OpenFlags, open_file};
+use crate::task::Task;
 use crate::task::schedule::add_task;
-use crate::task::{Task, schedule};
 use crate::timer::get_time_ms;
 use alloc::sync::Arc;
-use log::{info, trace};
 
 pub fn sys_exit(exit_code: i32) -> isize {
     PROCESSOR.as_mut().exit_current(exit_code);
@@ -19,7 +18,7 @@ pub fn sys_abort() -> isize {
 }
 
 pub fn sys_yield() -> isize {
-    schedule::yield_now();
+    PROCESSOR.as_mut().yield_current();
     0
 }
 
@@ -70,7 +69,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         .children
         .iter()
         .enumerate()
-        .find(|(_, p)| p.get_inner().is_zombie() && (pid == -1 ||pid as usize == p.pid.value));
+        .find(|(_, p)| p.get_inner().is_zombie() && (pid == -1 || pid as usize == p.pid.value));
     if let Some((idx, _)) = pair {
         let child = inner.children.remove(idx);
         // confirm that child will be deallocated after being removed from children list

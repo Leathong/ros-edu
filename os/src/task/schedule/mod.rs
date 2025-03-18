@@ -45,7 +45,7 @@ pub fn exit_current() {
         if let Some(next) = rq.front() {
             ReschedAction::SwitchTo(next.clone())
         } else {
-            ReschedAction::Retry
+            ReschedAction::DoNothing
         }
     });
 
@@ -76,6 +76,9 @@ where
         match action {
             ReschedAction::DoNothing => {
                 info!("do nothing");
+                unsafe {
+                    asm!("wfi");
+                }
                 return;
             }
             ReschedAction::Retry => {
