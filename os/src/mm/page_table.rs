@@ -10,6 +10,8 @@ use macros::ptenv_call;
 use riscv::register::sstatus::{Sstatus, set_sum};
 use riscv::register::{satp, sstatus};
 
+use super::frame_allocator::frame_dealloc;
+
 global_asm!(include_str!("switch_env.S"));
 
 bitflags! {
@@ -117,6 +119,28 @@ impl PageTable {
         }
     }
 
+    pub(super) fn release(&self) {
+        ptenv_call!(Self::release_internal, self)
+    }
+
+    fn release_internal(&self) {
+        let root_entries = self.root_ppn.get_pte_array();
+        for root in root_entries[2..256].into_iter() {
+            if root.is_valid() {
+                let ppn = root.ppn();
+                let entries = ppn.get_pte_array();
+                for entry in entries {
+                    if entry.is_valid() {
+                        let ppn = entry.ppn();
+                        frame_dealloc(ppn);
+                    }
+                }
+                frame_dealloc(ppn);
+            }
+        }
+        frame_dealloc(self.root_ppn);
+    }
+
     pub fn spawn(&self, asid: usize) -> Self {
         let mut pt = PageTable {
             root_ppn: 0.into(),
@@ -199,7 +223,7 @@ impl PageTable {
         *pte = PageTableEntry::new(pte.ppn(), flags | PTEFlags::V);
     }
 
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+    pub fn map(&self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         // info!(
         //     "self {:p} {:x} to {:x} asid: {}",
         //     self, vpn.0, ppn.0, self.asid
@@ -224,7 +248,8 @@ impl PageTable {
     }
 
     pub fn unmap(&mut self, vpn: VirtPageNum) {
-        ptenv_call!(Self::unmap_internal, self.root_ppn.0, vpn.0);
+        // info!("self {:p} {:x} asid: {}", self, vpn.0, self.asid);
+        ptenv_call!(Self::unmap_internal, self, vpn.0);
     }
 
     fn unmap_internal(&self, vpn: VirtPageNum) {

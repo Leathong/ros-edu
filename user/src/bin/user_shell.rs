@@ -26,14 +26,16 @@ pub fn main() -> i32 {
         match c {
             LF | CR => {
                 println!("");
-                if !line.is_empty() {
+                while !line.is_empty() {
                     line.push('\0');
                     let pid = spawn(line.as_str());
-                    println!("Shell: Process {} created", pid);
                     if pid < 0 {
-                        return -4;
+                        println!("Shell: {} not found", line);
+                        line.clear();
+                        break;
                     }
 
+                    println!("Shell: Process {} created", pid);
                     let mut exit_code: i32 = 0;
                     let exit_pid = waitpid(pid as usize, &mut exit_code);
                     assert_eq!(pid, exit_pid);

@@ -2,7 +2,7 @@ use core::arch::asm;
 
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use lazy_static::lazy_static;
-use log::info;
+use log::{debug, info};
 use spin::Mutex;
 
 use crate::{cpu::processor, task::Task};
@@ -53,7 +53,7 @@ pub fn exit_current() {
 }
 
 pub fn yield_now() {
-    info!("yield");
+    debug!("yield");
     reschedule(|rq| {
         if let Some(current_task) = Task::current_task() {
             rq.pop_front();

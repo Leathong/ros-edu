@@ -7,7 +7,6 @@ use super::page_table::{PTEFlags, PageTable};
 use crate::config::MMIO;
 use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE};
 use crate::println;
-use crate::task::Task;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
@@ -41,6 +40,16 @@ pub fn init_kernel_space(dtb_addr: usize, mem_end: usize) {
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
+}
+
+impl Drop for MemorySet {
+    fn drop(&mut self) {
+        for area in self.areas.iter_mut() {
+            area.unmap(&mut self.page_table);
+        }
+
+        self.page_table.release();
+    }
 }
 
 impl MemorySet {
@@ -235,7 +244,7 @@ impl MapArea {
         }
     }
 
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
+    pub fn map_one(&self, page_table: &PageTable, vpn: VirtPageNum) -> PhysPageNum {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::KernelOffset => {
@@ -259,7 +268,7 @@ impl MapArea {
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         page_table.unmap(vpn);
     }
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    pub fn map(&self, page_table: &PageTable) {
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);
         }

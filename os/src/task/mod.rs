@@ -16,7 +16,7 @@ use crate::{
 };
 use context::TaskContext;
 use lazy_static::lazy_static;
-use log::{info, trace};
+use log::{debug, info, trace};
 use riscv::{
     interrupt::{
         Trap,
@@ -87,9 +87,7 @@ impl Task {
                         ) as usize;
                     }
                     _ => {
-                        info!(
-                            "Unsupported trap {:?}", cause
-                        );
+                        info!("Unsupported trap {:?}", cause);
                         PROCESSOR.as_mut().abort_current();
                         break;
                     }
@@ -137,10 +135,7 @@ impl Task {
         user_ctx.set_ip(entry_point);
         user_ctx.set_sp(user_stack_top);
 
-        info!(
-            "create task pid {} entry: {:#x}",
-            pid_handle.value, entry_point
-        );
+        debug!("create task pid {}", pid_handle.value);
 
         let task = Self {
             pid: pid_handle,

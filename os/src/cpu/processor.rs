@@ -1,6 +1,6 @@
 use crate::{cpu_local, lang_items::print_backtrace, task};
 use alloc::sync::Arc;
-use log::{info, trace};
+use log::{debug, info, trace};
 use spin::Once;
 
 use crate::task::{Task, context::TaskContext, context_switch};
@@ -63,7 +63,7 @@ impl Processor {
         inner.memory_set.activate();
         let ctx_ptr = &raw const (inner.task_ctx);
 
-        info!("switch to task {}", next_task.pid.value);
+        debug!("switch to task {}", next_task.pid.value);
         unsafe {
             drop(next_task);
             // this function does not return, manually drop all the variables on the stack

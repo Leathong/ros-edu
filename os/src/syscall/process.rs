@@ -70,7 +70,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         .children
         .iter()
         .enumerate()
-        .find(|(_, p)| p.get_inner().is_zombie() && (pid == -1 || pid as usize == p.pid.value));
+        .find(|(_, p)| p.get_inner().is_zombie() && (pid == -1 ||pid as usize == p.pid.value));
     if let Some((idx, _)) = pair {
         let child = inner.children.remove(idx);
         // confirm that child will be deallocated after being removed from children list
