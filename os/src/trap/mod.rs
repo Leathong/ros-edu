@@ -3,9 +3,7 @@ pub mod context;
 use core::arch::global_asm;
 
 use context::TrapFrame;
-use riscv::register::{
-    satp::{self}, scause, sepc, sie, sstatus, stval, stvec
-};
+use riscv::register::{sepc, sie, stvec};
 
 use crate::{lang_items::print_backtrace, println, sbi::shutdown};
 
@@ -34,9 +32,7 @@ pub fn enable_timer_interrupt() {
 #[allow(unused)]
 fn trap_handler(trapframe: &TrapFrame) -> ! {
     let sepc = sepc::read();
-    println!(
-        "[trap] a trap occurs!"
-    );
+    println!("[trap] a trap occurs!");
     unsafe {
         print_backtrace(trapframe.general.s0, sepc);
     };

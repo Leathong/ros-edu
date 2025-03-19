@@ -10,7 +10,7 @@ use crate::println;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::*;
-use log::{info, trace};
+use log::trace;
 use spin::Mutex;
 
 struct KernelSpaceInitParam {
@@ -99,7 +99,7 @@ impl MemorySet {
         );
 
         println!("mapping dtb");
-        let mut dtb_area = MapArea::new(
+        let dtb_area = MapArea::new(
             dtb_addr.into(),
             mem_end.into(),
             MapType::Identical,
@@ -108,7 +108,7 @@ impl MemorySet {
         dtb_area.map(&mut memory_set.page_table);
 
         println!("mapping .text section");
-        let mut text_area = MapArea::new(
+        let text_area = MapArea::new(
             (stext as usize).into(),
             (etext as usize).into(),
             MapType::KernelOffset,
@@ -127,7 +127,7 @@ impl MemorySet {
         //     None,
         // );
         println!("mapping .rodata section");
-        let mut rodata_area = MapArea::new(
+        let rodata_area = MapArea::new(
             (srodata as usize).into(),
             (erodata as usize).into(),
             MapType::KernelOffset,
@@ -136,7 +136,7 @@ impl MemorySet {
         rodata_area.map(&mut memory_set.page_table);
 
         println!("mapping .data section");
-        let mut data_area = MapArea::new(
+        let data_area = MapArea::new(
             (sdata as usize).into(),
             (edata as usize).into(),
             MapType::KernelOffset,
@@ -145,7 +145,7 @@ impl MemorySet {
         data_area.map(&mut memory_set.page_table);
 
         println!("mapping .bss section");
-        let mut bss_area = MapArea::new(
+        let bss_area = MapArea::new(
             (sbss_with_stack as usize).into(),
             (ebss as usize).into(),
             MapType::KernelOffset,
@@ -163,7 +163,7 @@ impl MemorySet {
     pub fn map_hard_ware(&mut self) {
         println!("mapping memory-mapped registers");
         for pair in MMIO {
-            let mut mmio_area = MapArea::new(
+            let mmio_area = MapArea::new(
                 (*pair).0.into(),
                 ((*pair).0 + (*pair).1).into(),
                 MapType::Identical,

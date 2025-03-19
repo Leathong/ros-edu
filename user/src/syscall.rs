@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+const SYSCALL_SHUTDOWN: usize = 1;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_READ: usize = 63;
@@ -73,4 +74,9 @@ pub fn sys_spawn(path: &str) -> isize {
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(SYSCALL_WAITPID, [pid as usize, exit_code as usize, 0])
+}
+
+pub fn sys_shutdown() ->! {
+    syscall(SYSCALL_SHUTDOWN, [0, 0, 0]);
+    panic!("sys_abort never returns!");
 }

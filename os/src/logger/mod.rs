@@ -1,4 +1,4 @@
-use log::{Log, Metadata, Record, SetLoggerError, LevelFilter};
+use log::{LevelFilter, Log, Metadata, Record, SetLoggerError};
 
 use crate::println;
 use lazy_static::lazy_static;

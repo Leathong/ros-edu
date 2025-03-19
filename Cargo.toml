@@ -1,7 +1,6 @@
 [workspace]
-members = ["os", "easy_fs"]
+members = ["os", "easy_fs", "macros"]
 resolver = "2"
-exclude = ["macros"]
 
 
 [profile.release]

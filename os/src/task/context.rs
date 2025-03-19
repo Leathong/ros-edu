@@ -2,8 +2,8 @@
 #[repr(C)]
 pub(crate) struct TaskContext {
     pub regs: CalleeRegs, // 0..12
-    pub pc: usize, // 13
-    pub tls: usize, // 14
+    pub pc: usize,        // 13
+    pub tls: usize,       // 14
 }
 
 /// Callee-saved registers.

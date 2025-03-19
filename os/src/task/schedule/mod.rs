@@ -48,8 +48,6 @@ pub fn exit_current() {
             ReschedAction::DoNothing
         }
     });
-
-    unreachable!()
 }
 
 pub fn yield_now() {
@@ -62,7 +60,7 @@ pub fn yield_now() {
         if let Some(next_task) = rq.front() {
             ReschedAction::SwitchTo(next_task.clone())
         } else {
-            ReschedAction::DoNothing
+            ReschedAction::Retry
         }
     })
 }

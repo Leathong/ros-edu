@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use easy_fs::{BlockDevice, EasyFileSystem};
-use std::fs::{self, read_dir, File, OpenOptions};
+use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;

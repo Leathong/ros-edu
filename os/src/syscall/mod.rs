@@ -9,6 +9,7 @@
 //! For clarity, each single syscall is implemented as its own function, named
 //! `sys_` then the name of the syscall. You can find functions like this in
 //! submodules, and you should also implement syscalls this way.
+const SYSCALL_SHUTDOWN: usize = 1;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_READ: usize = 63;
@@ -22,17 +23,22 @@ const SYSCALL_SPAWN: usize = 220;
 const SYSCALL_WAITPID: usize = 260;
 
 mod fs;
+mod power;
 mod process;
 
 use fs::*;
-use log::{info, trace};
+use log::trace;
+use power::*;
 use process::*;
 use riscv::register::sstatus;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     trace!("handle syscall id: {}", syscall_id);
-    unsafe {sstatus::set_sum();}
+    unsafe {
+        sstatus::set_sum();
+    }
     let res = match syscall_id {
+        SYSCALL_SHUTDOWN => sys_shutdown(),
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),

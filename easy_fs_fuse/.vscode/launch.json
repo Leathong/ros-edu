@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'easy_fs_fuse'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=easy_fs_fuse",
+                    "--package=easy_fs_fuse"
+                ],
+                "filter": {
+                    "name": "easy_fs_fuse",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--source=../user/target/riscv64gc-unknown-none-elf/debug/",
+                "--target=target/"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'easy_fs_fuse'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=easy_fs_fuse",
+                    "--package=easy_fs_fuse"
+                ],
+                "filter": {
+                    "name": "easy_fs_fuse",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

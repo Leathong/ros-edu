@@ -6,10 +6,11 @@ use crate::{
     mm::{
         address::{VirtAddr, VirtPageNum},
         heap_allocator,
-        memory_set::KERNEL_SPACE, page_table::{PageTable, PageTableEntry},
-    }, task::Task,
+        memory_set::KERNEL_SPACE,
+    },
+    task::Task,
 };
-use alloc::{sync::Arc, task};
+use alloc::sync::Arc;
 use easy_fs::BlockDevice;
 use spin::Mutex;
 use virtio_drivers::{
@@ -18,7 +19,7 @@ use virtio_drivers::{
     transport::{Transport, mmio::MmioTransport},
 };
 
-use log::{info, trace};
+use log::trace;
 
 pub fn init_blk(transport: MmioTransport) {
     trace!(
@@ -75,19 +76,22 @@ unsafe impl Hal for VirtioHal {
         let vpn = VirtPageNum::from(vaddr);
         let pte;
         if let Some(task) = Task::current_task() {
-            pte = task.get_inner().memory_set.get_page_table().translate(VirtPageNum::from(vaddr));
+            pte = task
+                .get_inner()
+                .memory_set
+                .get_page_table()
+                .translate(VirtPageNum::from(vaddr));
         } else {
-            pte = KERNEL_SPACE.lock().get_page_table().translate(VirtPageNum::from(vaddr));
+            pte = KERNEL_SPACE
+                .lock()
+                .get_page_table()
+                .translate(VirtPageNum::from(vaddr));
         }
         let ppn = pte.unwrap().ppn();
         unsafe {
             core::slice::from_raw_parts_mut(ptr.as_ptr(), size).fill(0);
         }
-        trace!(
-            "dma_alloc: {:x} {:x}",
-            ppn.0 << 12,
-            ptr.as_ptr() as usize,
-        );
+        trace!("dma_alloc: {:x} {:x}", ppn.0 << 12, ptr.as_ptr() as usize,);
         (ppn.0 << 12, ptr)
     }
 
@@ -119,9 +123,16 @@ unsafe impl Hal for VirtioHal {
 
         let pte;
         if let Some(task) = Task::current_task() {
-            pte = task.get_inner().memory_set.get_page_table().translate(VirtPageNum::from(vaddr));
+            pte = task
+                .get_inner()
+                .memory_set
+                .get_page_table()
+                .translate(VirtPageNum::from(vaddr));
         } else {
-            pte = KERNEL_SPACE.lock().get_page_table().translate(VirtPageNum::from(vaddr));
+            pte = KERNEL_SPACE
+                .lock()
+                .get_page_table()
+                .translate(VirtPageNum::from(vaddr));
         }
         let ppn = pte.unwrap().ppn();
         let paddr = (ppn.0 << 12) | (vaddr_value & ((1 << 12) - 1));
@@ -134,6 +145,5 @@ unsafe impl Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         direction: virtio_drivers::BufferDirection,
     ) {
-        
     }
 }

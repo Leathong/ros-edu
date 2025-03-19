@@ -112,3 +112,7 @@ pub fn sleep(period_ms: usize) {
         sys_yield();
     }
 }
+
+pub fn shutdown() {
+    sys_shutdown();
+}

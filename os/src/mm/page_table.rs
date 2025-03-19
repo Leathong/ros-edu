@@ -5,7 +5,7 @@ use crate::mm::address::PhysPageNum;
 use crate::mm::{address::VirtPageNum, frame_allocator::frame_alloc};
 use alloc::vec::Vec;
 use bitflags::bitflags;
-use log::{info, trace};
+use log::trace;
 use macros::ptenv_call;
 use riscv::register::sstatus::{Sstatus, set_sum};
 use riscv::register::{satp, sstatus};

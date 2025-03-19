@@ -5,25 +5,25 @@
 
 extern crate alloc;
 
-mod logger;
-mod console;
 mod config;
-mod mm;
-mod lang_items;
-mod trap;
-mod task;
-mod fs;
-mod drivers;
-mod sbi;
-mod timer;
-mod syscall;
+mod console;
 mod cpu;
+mod drivers;
+mod fs;
+mod lang_items;
+mod logger;
+mod mm;
+mod sbi;
+mod syscall;
+mod task;
+mod timer;
+mod trap;
 
+use crate::sbi::shutdown;
 use core::arch::global_asm;
 use fdt::Fdt;
-use task::schedule::yield_now;
-use crate::sbi::shutdown;
 use log::info;
+use task::schedule::yield_now;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -59,4 +59,3 @@ fn walk_dt(fdt: Fdt) {
         }
     }
 }
-

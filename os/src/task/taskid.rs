@@ -29,13 +29,11 @@ impl PidAllocator {
     ///Allocate a pid
     pub fn alloc(&mut self) -> ProcessId {
         if let Some(pid) = self.recycled.pop() {
-            ProcessId {
-                value: pid,
-            }
+            ProcessId { value: pid }
         } else {
             self.current += 1;
             ProcessId {
-                value: self.current - 1
+                value: self.current - 1,
             }
         }
     }
