@@ -84,27 +84,11 @@ pub fn spawn(path: &str) -> isize {
     sys_spawn(path)
 }
 pub fn wait(exit_code: &mut i32) -> isize {
-    loop {
-        match sys_waitpid(-1, exit_code as *mut _) {
-            -2 => {
-                yield_();
-            }
-            // -1 or a real pid
-            exit_pid => return exit_pid,
-        }
-    }
+    sys_waitpid(-1, exit_code as *mut _)
 }
 
 pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
-    loop {
-        match sys_waitpid(pid as isize, exit_code as *mut _) {
-            -2 => {
-                yield_();
-            }
-            // -1 or a real pid
-            exit_pid => return exit_pid,
-        }
-    }
+    sys_waitpid(pid as isize, exit_code as *mut _)
 }
 pub fn sleep(period_ms: usize) {
     let start = sys_get_time();
@@ -115,4 +99,24 @@ pub fn sleep(period_ms: usize) {
 
 pub fn shutdown() {
     sys_shutdown();
+}
+
+pub fn mutex_create() -> isize {
+    sys_mutex_create()
+}
+pub fn mutex_lock(mutex_id: usize) {
+    sys_mutex_lock(mutex_id);
+}
+pub fn mutex_unlock(mutex_id: usize) {
+    sys_mutex_unlock(mutex_id);
+}
+
+pub fn thread_create(entry: usize, arg: usize) -> isize {
+    sys_thread_create(entry, arg)
+}
+pub fn gettid() -> isize {
+    sys_gettid()
+}
+pub fn waittid(tid: usize) -> isize {
+    sys_waittid(tid)
 }

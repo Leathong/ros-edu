@@ -6,9 +6,9 @@ use alloc::vec::Vec;
 
 use crate::fs::{OpenFlags, open_file};
 use crate::mm::UserBuffer;
-use crate::task::Task;
+use crate::task::current_task;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
-    let task = Task::current_task().unwrap();
+    let task = current_task().unwrap();
     let inner = task.get_mutable_inner();
 
     if fd >= inner.fd_table.len() {
@@ -31,7 +31,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
-    let task = Task::current_task().unwrap();
+    let task = current_task().unwrap();
     let inner = task.get_mutable_inner();
     if fd >= inner.fd_table.len() {
         return -1;
@@ -52,7 +52,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let task = Task::current_task().unwrap();
+    let task = current_task().unwrap();
 
     let path = unsafe {
         match CStr::from_ptr(path).to_str() {
@@ -71,7 +71,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    let task = Task::current_task().unwrap();
+    let task = current_task().unwrap();
     let inner = task.get_mutable_inner();
     if fd >= inner.fd_table.len() {
         return -1;

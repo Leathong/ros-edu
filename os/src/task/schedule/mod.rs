@@ -2,10 +2,13 @@ use core::arch::asm;
 
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::debug;
 use spin::Mutex;
 
-use crate::{cpu::processor, task::Task};
+use crate::{
+    cpu::processor,
+    task::{Task, TaskStatus, current_task},
+};
 
 enum ReschedAction {
     /// Keep running current task and do nothing.
@@ -39,13 +42,23 @@ pub fn add_task(task: Arc<Task>) {
     TASK_MANAGER.lock().add_task(task);
 }
 
+pub fn park_current(waiting_queue: &mut VecDeque<Arc<Task>>) {
+    reschedule(|rq| {
+        let current = rq.pop_front().unwrap();
+        current.get_mutable_inner().user_ctx.sepc -= 4;
+        current.get_mutable_inner().status = TaskStatus::Waiting;
+        waiting_queue.push_back(current);
+        ReschedAction::DoNothing
+    });
+}
+
 pub fn exit_current() {
     reschedule(|rq| {
         rq.pop_front();
         if let Some(next) = rq.front() {
             ReschedAction::SwitchTo(next.clone())
         } else {
-            ReschedAction::DoNothing
+            ReschedAction::Retry
         }
     });
 }
@@ -53,9 +66,11 @@ pub fn exit_current() {
 pub fn yield_now() {
     debug!("yield");
     reschedule(|rq| {
-        if let Some(current_task) = Task::current_task() {
-            rq.pop_front();
-            rq.push_back(current_task);
+        if let Some(current_task) = current_task() {
+            if current_task.get_inner().status != TaskStatus::Waiting {
+                rq.pop_front();
+                rq.push_back(current_task);
+            }
         }
         if let Some(next_task) = rq.front() {
             ReschedAction::SwitchTo(next_task.clone())
@@ -73,14 +88,11 @@ where
         let action = get_action(&mut TASK_MANAGER.lock().ready_queue);
         match action {
             ReschedAction::DoNothing => {
-                info!("do nothing");
-                unsafe {
-                    asm!("wfi");
-                }
+                debug!("do nothing");
                 return;
             }
             ReschedAction::Retry => {
-                info!("retry");
+                debug!("retry");
                 unsafe {
                     asm!("wfi");
                 }

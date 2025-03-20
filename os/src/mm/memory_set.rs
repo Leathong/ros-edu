@@ -73,9 +73,9 @@ impl MemorySet {
                     & (!MapPermission::X)
                     & (!MapPermission::U)),
             };
-            write_area.map(&mut self.page_table);
+            write_area.map(&self.page_table);
             write_area.copy_data(data);
-            map_area.update_perm(&mut self.page_table);
+            map_area.update_perm(&self.page_table);
         } else {
             map_area.map(&mut self.page_table);
         }
@@ -215,7 +215,7 @@ impl MemorySet {
         (memory_set, elf.header.pt2.entry_point() as usize)
     }
 
-    pub fn activate(&mut self) {
+    pub fn activate(&self) {
         self.page_table.activate();
     }
 }
@@ -273,7 +273,7 @@ impl MapArea {
             self.map_one(page_table, vpn);
         }
     }
-    pub fn update_perm(&mut self, page_table: &mut PageTable) {
+    pub fn update_perm(&mut self, page_table: &PageTable) {
         for vpn in self.vpn_range {
             let pte_flags = PTEFlags::from_bits(self.map_perm.bits()).unwrap();
             page_table.update_perm(vpn, pte_flags);

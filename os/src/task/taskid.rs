@@ -3,11 +3,11 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 
 #[derive(Debug)]
-pub struct ProcessId {
+pub struct TaskId {
     pub value: usize,
 }
 
-impl Drop for ProcessId {
+impl Drop for TaskId {
     fn drop(&mut self) {
         PID_ALLOCATOR.lock().dealloc(self.value);
     }
@@ -27,12 +27,12 @@ impl PidAllocator {
         }
     }
     ///Allocate a pid
-    pub fn alloc(&mut self) -> ProcessId {
+    pub fn alloc(&mut self) -> TaskId {
         if let Some(pid) = self.recycled.pop() {
-            ProcessId { value: pid }
+            TaskId { value: pid }
         } else {
             self.current += 1;
-            ProcessId {
+            TaskId {
                 value: self.current - 1,
             }
         }
@@ -54,10 +54,6 @@ lazy_static! {
 }
 
 ///Allocate a pid from PID_ALLOCATOR
-pub fn pid_alloc() -> ProcessId {
+pub fn taskid_alloc() -> TaskId {
     PID_ALLOCATOR.lock().alloc()
 }
-
-// pub struct ThreadId {
-//     pub value: usize,
-// }

@@ -21,16 +21,26 @@ const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_SPAWN: usize = 220;
 const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_THREAD_CREATE: usize = 1000;
+const SYSCALL_GETTID: usize = 1001;
+const SYSCALL_WAITTID: usize = 1002;
+const SYSCALL_MUTEX_CREATE: usize = 1010;
+const SYSCALL_MUTEX_LOCK: usize = 1011;
+const SYSCALL_MUTEX_UNLOCK: usize = 1012;
 
 mod fs;
 mod power;
 mod process;
+mod sync;
+mod thread;
 
 use fs::*;
 use log::trace;
 use power::*;
 use process::*;
 use riscv::register::sstatus;
+use sync::*;
+use thread::*;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     trace!("handle syscall id: {}", syscall_id);
@@ -50,6 +60,12 @@ pub fn handle_syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_SPAWN => sys_spawn(args[0] as *const u8),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
+        SYSCALL_THREAD_CREATE => sys_thread_create(args[0], args[1]),
+        SYSCALL_GETTID => sys_gettid(),
+        SYSCALL_WAITTID => sys_waittid(args[0]) as isize,
+        SYSCALL_MUTEX_CREATE => sys_mutex_create(),
+        SYSCALL_MUTEX_LOCK => sys_mutex_lock(args[0]),
+        SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     };
     trace!("handle syscall {} done, res {}", syscall_id, res);

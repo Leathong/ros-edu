@@ -212,12 +212,12 @@ impl PageTable {
         result
     }
 
-    pub fn update_perm(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+    pub fn update_perm(&self, vpn: VirtPageNum, flags: PTEFlags) {
         // info!("self: {:p} vpn = {:?}, flags = {:?}", self, vpn, flags);
         ptenv_call!(Self::update_perm_internal, self, vpn.0, flags.bits());
     }
 
-    fn update_perm_internal(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+    fn update_perm_internal(&self, vpn: VirtPageNum, flags: PTEFlags) {
         // info!("self: {:p} vpn = {:?}, flags = {:?}\n", self, vpn, flags);
         let pte = self.find_pte(vpn).unwrap();
         *pte = PageTableEntry::new(pte.ppn(), flags | PTEFlags::V);

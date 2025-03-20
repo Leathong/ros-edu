@@ -12,6 +12,12 @@ const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_SPAWN: usize = 220;
 const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_THREAD_CREATE: usize = 1000;
+const SYSCALL_GETTID: usize = 1001;
+const SYSCALL_WAITTID: usize = 1002;
+const SYSCALL_MUTEX_CREATE: usize = 1010;
+const SYSCALL_MUTEX_LOCK: usize = 1011;
+const SYSCALL_MUTEX_UNLOCK: usize = 1012;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -79,4 +85,28 @@ pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
 pub fn sys_shutdown() ->! {
     syscall(SYSCALL_SHUTDOWN, [0, 0, 0]);
     panic!("sys_abort never returns!");
+}
+
+pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
+    syscall(SYSCALL_THREAD_CREATE, [entry, arg, 0])
+}
+
+pub fn sys_gettid() -> isize {
+    syscall(SYSCALL_GETTID, [0; 3])
+}
+
+pub fn sys_waittid(tid: usize) -> isize {
+    syscall(SYSCALL_WAITTID, [tid, 0, 0])
+}
+
+pub fn sys_mutex_create() -> isize {
+    syscall(SYSCALL_MUTEX_CREATE, [0, 0, 0])
+}
+
+pub fn sys_mutex_lock(id: usize) -> isize {
+    syscall(SYSCALL_MUTEX_LOCK, [id, 0, 0])
+}
+
+pub fn sys_mutex_unlock(id: usize) -> isize {
+    syscall(SYSCALL_MUTEX_UNLOCK, [id, 0, 0])
 }

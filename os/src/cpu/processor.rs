@@ -1,4 +1,8 @@
-use crate::{cpu_local, lang_items::print_backtrace, task};
+use crate::{
+    cpu_local,
+    lang_items::print_backtrace,
+    task::{self, schedule::add_task},
+};
 use alloc::sync::Arc;
 use log::{debug, info, trace};
 use spin::Once;
@@ -40,20 +44,26 @@ impl Processor {
         let current = self.current().unwrap();
         current.get_mutable_inner().exit_code = exit_code;
         current.get_mutable_inner().status = task::TaskStatus::Zombie;
+        for task in current.get_inner().waiting_tasks.iter() {
+            add_task(task.clone());
+        }
+        current.get_mutable_inner().waiting_tasks.clear();
     }
 
     pub fn abort_current(&self) {
         let current = self.current().unwrap();
         let fp = current.get_inner().user_ctx.general.s0;
         let ra: usize = current.get_inner().user_ctx.sepc;
-        unsafe {
-            info!(
-                "Aborting task {} fp: {:x} ra: {:x}",
-                current.pid.value,
-                *(fp as *mut usize),
-                ra
-            );
-            print_backtrace(fp, ra);
+        if fp != 0 {
+            unsafe {
+                info!(
+                    "Aborting task {} fp: {:x} ra: {:x}",
+                    current.taskid.value,
+                    *(fp as *mut usize),
+                    ra
+                );
+                print_backtrace(fp, ra);
+            }
         }
         self.exit_current(i32::MIN);
     }
@@ -65,10 +75,10 @@ impl Processor {
         };
         self.current = Some(next_task.clone());
         let inner = next_task.get_mutable_inner();
-        inner.memory_set.activate();
+        inner.memory_set.get_mut().activate();
         let ctx_ptr = &raw const (inner.task_ctx);
 
-        debug!("switch to task {}", next_task.pid.value);
+        debug!("switch to task {}", next_task.taskid.value);
         unsafe {
             drop(next_task);
             // this function does not return, manually drop all the variables on the stack

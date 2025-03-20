@@ -16,10 +16,10 @@ macro_rules! cpu_local {
         impl $name {
             pub fn as_mut_ptr(&self) -> *mut $type {
                 fn __static_ref_init() -> $crate::cpu::local::CpuLocalCell<$type> {
-                    $crate::cpu::local::CpuLocalCell::__new($init)
+                    $crate::cpu::local::CpuLocalCell::new($init)
                 }
 
-                self.value.call_once(|| __static_ref_init()).get_mut()
+                self.value.call_once(|| __static_ref_init()).get_mut_ptr()
             }
 
             pub fn as_mut(&self) -> &mut $type {
@@ -33,11 +33,15 @@ pub struct CpuLocalCell<T>(UnsafeCell<T>);
 unsafe impl<T> Sync for CpuLocalCell<T> {}
 
 impl<T> CpuLocalCell<T> {
-    pub fn __new(value: T) -> Self {
+    pub fn new(value: T) -> Self {
         Self(UnsafeCell::new(value))
     }
 
-    pub fn get_mut(&self) -> *mut T {
+    pub fn get_mut_ptr(&self) -> *mut T {
         self.0.get()
+    }
+
+    pub fn get_mut(&self) -> &mut T {
+        unsafe { &mut *self.get_mut_ptr() }
     }
 }

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, punctuated::Punctuated, token::Eq, Ident, Token};
+use syn::{Ident, Token, parse::Parse, parse_macro_input, punctuated::Punctuated, token::Eq};
 
 struct PtenvCallArgs {
     method: syn::Path,
@@ -49,24 +49,24 @@ pub fn ptenv_call(input: TokenStream) -> TokenStream {
     let mut asm_operands = Vec::new();
 
     for (i, arg) in arguments.iter().enumerate() {
-        let reg = registers.get(i).unwrap_or_else(|| {
-            panic!("Too many arguments (max {} supported)", registers.len())
-        });
+        let reg = registers
+            .get(i)
+            .unwrap_or_else(|| panic!("Too many arguments (max {} supported)", registers.len()));
         asm_operands.push(quote! { in(#reg) #arg, });
     }
 
     let mut out_bindings = Vec::new();
     for (i, arg) in args.out_arg.iter().enumerate() {
-        let reg = registers.get(i).unwrap_or_else(|| {
-            panic!("Too many arguments (max {} supported)", registers.len())
-        });
+        let reg = registers
+            .get(i)
+            .unwrap_or_else(|| panic!("Too many arguments (max {} supported)", registers.len()));
         out_bindings.push(quote! { lateout(#reg) #arg, });
     }
 
     quote! {
         unsafe {
             asm!(
-                r"        
+                r"
                 li t0, 1 << 1
                 csrrc s2, sstatus, t0
                 csrr s3, satp

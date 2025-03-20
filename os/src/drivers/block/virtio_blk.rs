@@ -8,7 +8,7 @@ use crate::{
         heap_allocator,
         memory_set::KERNEL_SPACE,
     },
-    task::Task,
+    task::current_task,
 };
 use alloc::sync::Arc;
 use easy_fs::BlockDevice;
@@ -75,10 +75,11 @@ unsafe impl Hal for VirtioHal {
         let vaddr = VirtAddr::from(ptr.as_ptr() as usize);
         let vpn = VirtPageNum::from(vaddr);
         let pte;
-        if let Some(task) = Task::current_task() {
+        if let Some(task) = current_task() {
             pte = task
                 .get_inner()
                 .memory_set
+                .get_mut()
                 .get_page_table()
                 .translate(VirtPageNum::from(vaddr));
         } else {
@@ -122,10 +123,11 @@ unsafe impl Hal for VirtioHal {
         let vaddr = VirtAddr::from(vaddr_value);
 
         let pte;
-        if let Some(task) = Task::current_task() {
+        if let Some(task) = current_task() {
             pte = task
                 .get_inner()
                 .memory_set
+                .get_mut()
                 .get_page_table()
                 .translate(VirtPageNum::from(vaddr));
         } else {
